@@ -1,4 +1,4 @@
--- // AEHMRE'S HUSS VALLEY HUB //
+-- // AEHMRE'S HUSS VALLEY HUB - CAMERA FOV //
 -- MADE BY: Emre_31er
 
 local Players = game:GetService("Players")
@@ -17,6 +17,7 @@ local Settings = {
 	Speed = 16,
 	ApplyJumpPower = false,
 	JumpPower = 50,
+	FieldOfView = 70,
 	InvisSpeed = 12,
 	ShowGlobalESP = false,
 	ShowTeamESP = false,
@@ -46,6 +47,7 @@ local CurrentHumanoid = nil
 local OriginalWalkSpeed = nil
 local OriginalJumpPower = nil
 local OriginalUseJumpPower = nil
+local OriginalFieldOfView = workspace.CurrentCamera and workspace.CurrentCamera.FieldOfView or 70
 local VisibleTab = "Character"
 local IsMinimized = false
 local NoticeSerial = 0
@@ -149,6 +151,17 @@ local function EnforceCharacterValues()
 		if humanoid.JumpPower ~= Settings.JumpPower then
 			humanoid.JumpPower = Settings.JumpPower
 		end
+	end
+end
+
+local function EnforceCameraFieldOfView()
+	if not alive then return end
+	local camera = workspace.CurrentCamera
+	if not camera then return end
+	local requested = math.clamp(tonumber(Settings.FieldOfView) or 70, 10, 300)
+	local supported = math.clamp(requested, 10, 120)
+	if math.abs(camera.FieldOfView - supported) > 0.001 then
+		camera.FieldOfView = supported
 	end
 end
 
@@ -433,6 +446,9 @@ local function SetSetting(key, value)
 	if key == "ApplySpeed" or key == "Speed" or key == "ApplyJumpPower" or key == "JumpPower" then
 		EnforceCharacterValues()
 	end
+	if key == "FieldOfView" then
+		EnforceCameraFieldOfView()
+	end
 	for _, refresh in ipairs(UIRefreshers) do refresh() end
 end
 
@@ -533,7 +549,7 @@ local Body = New("Frame", Main, {
 local Sidebar = New("ScrollingFrame", Body, {
 	Name = "Sidebar",
 	Size = UDim2.new(0, 165, 1, 0),
-	CanvasSize = UDim2.fromOffset(0, 236),
+	CanvasSize = UDim2.fromOffset(0, 295),
 	ScrollBarThickness = 2,
 	ScrollingDirection = Enum.ScrollingDirection.Y,
 	BackgroundColor3 = Colors.Panel,
@@ -598,7 +614,7 @@ end)
 
 local PageFrames = {}
 local TabButtons = {}
-local TabNames = {"Character", "Visuals & ESP", "More coming soon!", "SETTINGS"}
+local TabNames = {"Character", "Visuals & ESP", "Camera", "More coming soon!", "SETTINGS"}
 
 local function RefreshTabs()
 	for name, button in pairs(TabButtons) do
@@ -647,8 +663,9 @@ end
 
 local CharacterPage = AddPage(TabNames[1], 1)
 local VisualsPage = AddPage(TabNames[2], 2)
-local ComingPage = AddPage(TabNames[3], 3)
-local SettingsPage = AddPage(TabNames[4], 4)
+local CameraPage = AddPage(TabNames[3], 3)
+local ComingPage = AddPage(TabNames[4], 4)
+local SettingsPage = AddPage(TabNames[5], 5)
 
 local function Card(page, title, height)
 	local card = New("Frame", page, {
@@ -840,6 +857,9 @@ AddModeSelector(VisualsPage)
 AddSlider(VisualsPage, "Invisibility Speed", "Move speed in Air and Bottom modes", "InvisSpeed", 1, 100, 200)
 Label(VisualsPage, "Global ESP takes priority if both ESP modes are enabled.", UDim2.new(1, -10, 0, 32), UDim2.fromOffset(0, 0), 10, Colors.Muted)
 
+AddSection(CameraPage, "CAMERA SETTINGS")
+AddSlider(CameraPage, "Field Of View", "S/T: 10-300 | Roblox camera supports up to 120", "FieldOfView", 10, 300, 300)
+
 AddSection(ComingPage, "MORE COMING SOON!")
 local ComingCard = Card(ComingPage, "Future Features", 100)
 Label(ComingCard, "New features will appear here.", UDim2.new(1, -24, 0, 35), UDim2.fromOffset(12, 24), 12, Colors.White)
@@ -896,10 +916,12 @@ Connect(LoadButton.MouseButton1Click, function()
 	for key in pairs(expectedBool) do
 		if type(decoded[key]) == "boolean" then SetSetting(key, decoded[key]) end
 	end
-	for _, key in ipairs({"Speed", "JumpPower", "InvisSpeed"}) do
+	for _, key in ipairs({"Speed", "JumpPower", "InvisSpeed", "FieldOfView"}) do
 		local number = decoded[key]
 		if type(number) == "number" and number == number and number ~= math.huge and number ~= -math.huge then
-			SetSetting(key, math.clamp(number, key == "InvisSpeed" and 1 or 0, key == "InvisSpeed" and 200 or 1000000))
+			local minimum = key == "InvisSpeed" and 1 or key == "FieldOfView" and 10 or 0
+			local maximum = key == "InvisSpeed" and 200 or key == "FieldOfView" and 300 or 1000000
+			SetSetting(key, math.clamp(number, minimum, maximum))
 		end
 	end
 	PresetStatus.Text = "Configuration preset loaded."
@@ -921,6 +943,8 @@ local function WipeHub()
 	Settings.ApplySpeed = false
 	Settings.ApplyJumpPower = false
 	RestoreCharacterValues()
+	local camera = workspace.CurrentCamera
+	if camera then camera.FieldOfView = OriginalFieldOfView end
 	alive = false
 	DisconnectAll(CharacterConnections)
 	DisconnectAll(ESPConnections)
@@ -1476,6 +1500,8 @@ Connect(workspace:GetPropertyChangedSignal("CurrentCamera"), function()
 	FitWindowToViewport()
 end)
 Connect(RunService.Heartbeat, EnforceCharacterValues)
+Connect(RunService.RenderStepped, EnforceCameraFieldOfView)
+EnforceCameraFieldOfView()
 Connect(LocalPlayer.CharacterAdded, function(character)
 	BindHumanoid(character)
 	if Settings.Invisibility then
