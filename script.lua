@@ -16,6 +16,7 @@ local Settings = {
 	ApplyJumpPower = false,
 	JumpPower = 50,
 	InvisSpeed = 12,
+	ESPOpacity = 35,
 	ShowGlobalESP = false,
 	ShowTeamESP = false,
 	Invisibility = false,
@@ -227,6 +228,7 @@ local function UpdateESP(player)
 	local color = Settings.ShowGlobalESP and Colors.White or (player.Neutral and Colors.White or player.TeamColor.Color)
 	highlight.FillColor = color
 	highlight.OutlineColor = color
+	highlight.FillTransparency = 1 - Settings.ESPOpacity / 100
 end
 
 local function RefreshESP()
@@ -424,7 +426,9 @@ local function SetSetting(key, value)
 		if OriginalJumpPower ~= nil then CurrentHumanoid.JumpPower = OriginalJumpPower end
 		if OriginalUseJumpPower ~= nil then CurrentHumanoid.UseJumpPower = OriginalUseJumpPower end
 	end
-	if key == "ShowGlobalESP" or key == "ShowTeamESP" then RefreshESP() end
+	if key == "ShowGlobalESP" or key == "ShowTeamESP" or key == "ESPOpacity" then
+		RefreshESP()
+	end
 	if key == "Invisibility" or key == "InvisibilityMode" then
 		if Settings.Invisibility then StartInvisibility() else ReleaseInvisibility() end
 	end
@@ -823,6 +827,7 @@ AddSlider(CharacterPage, "JumpPower", "S: slider (0-500) | T: exact value (up to
 AddSection(VisualsPage, "VISUALS & ESP")
 AddToggle(VisualsPage, "Show Global ESP", "White highlight for every other player, all teams", "ShowGlobalESP")
 AddToggle(VisualsPage, "Show Team ESP", "Highlight players with their own team colors", "ShowTeamESP")
+AddSlider(VisualsPage, "ESP Opacity", "Adjust ESP visibility (0-100%)", "ESPOpacity", 0, 100, 100)
 AddToggle(VisualsPage, "Invisibility", "Local invisibility test with Air / Bottom mode", "Invisibility")
 AddModeSelector(VisualsPage)
 AddSlider(VisualsPage, "Invisibility Speed", "Move speed in Air and Bottom modes", "InvisSpeed", 1, 100, 200)
