@@ -445,6 +445,52 @@ local ScreenGui = New("ScreenGui", PlayerGui, {
 	IgnoreGuiInset = false
 })
 
+local MouseUnlocked = false
+local PreviousMouseBehavior = Enum.MouseBehavior.Default
+local PreviousMouseIconEnabled = true
+
+local MouseUnlockButton = New("TextButton", ScreenGui, {
+	Name = "MouseUnlockModal",
+	Size = UDim2.fromOffset(1, 1),
+	Position = UDim2.fromOffset(0, 0),
+	BackgroundTransparency = 1,
+	TextTransparency = 1,
+	Text = "",
+	BorderSizePixel = 0,
+	Active = true,
+	Modal = false,
+	AutoButtonColor = false
+})
+
+local function SetMouseUnlocked(state)
+	if MouseUnlocked == state then return end
+
+	MouseUnlocked = state
+
+	if MouseUnlocked then
+		PreviousMouseBehavior = UserInputService.MouseBehavior
+		PreviousMouseIconEnabled = UserInputService.MouseIconEnabled
+
+		MouseUnlockButton.Modal = true
+		UserInputService.MouseBehavior = Enum.MouseBehavior.Default
+		UserInputService.MouseIconEnabled = true
+	else
+		MouseUnlockButton.Modal = false
+		UserInputService.MouseBehavior = PreviousMouseBehavior
+		UserInputService.MouseIconEnabled = PreviousMouseIconEnabled
+	end
+
+	print("[Huss Valley] Mouse:", MouseUnlocked and "UNLOCKED" or "LOCKED")
+end
+
+Connect(RunService.RenderStepped, function()
+	if not alive or not MouseUnlocked then return end
+
+	MouseUnlockButton.Modal = true
+	UserInputService.MouseBehavior = Enum.MouseBehavior.Default
+	UserInputService.MouseIconEnabled = true
+end)
+
 local Main = New("Frame", ScreenGui, {
 	Name = "MainWindow",
 	Size = UDim2.fromOffset(550, 420),
@@ -854,6 +900,7 @@ local ConfirmationActive = false
 
 local function WipeHub()
 	if not alive then return end
+	SetMouseUnlocked(false)
 	Settings.Invisibility = false
 	ReleaseInvisibility()
 	Settings.ShowGlobalESP = false
@@ -903,12 +950,17 @@ end)
 
 Connect(UserInputService.InputBegan, function(input, processed)
 	if not alive or processed or UserInputService:GetFocusedTextBox() then return end
+
 	if input.KeyCode == Enum.KeyCode.L then
 		Main.Visible = not Main.Visible
+
 		if Main.Visible then
 			NoticeSerial += 1
 			Notification.Visible = false
 		end
+
+	elseif input.KeyCode == Enum.KeyCode.N then
+		SetMouseUnlocked(not MouseUnlocked)
 	end
 end)
 
