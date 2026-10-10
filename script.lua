@@ -5,6 +5,7 @@ local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local HttpService = game:GetService("HttpService")
+local GuiService = game:GetService("GuiService")
 
 local LocalPlayer = Players.LocalPlayer
 local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
@@ -16,7 +17,6 @@ local Settings = {
 	ApplyJumpPower = false,
 	JumpPower = 50,
 	InvisSpeed = 12,
-	ESPOpacity = 35,
 	ShowGlobalESP = false,
 	ShowTeamESP = false,
 	Invisibility = false,
@@ -228,7 +228,6 @@ local function UpdateESP(player)
 	local color = Settings.ShowGlobalESP and Colors.White or (player.Neutral and Colors.White or player.TeamColor.Color)
 	highlight.FillColor = color
 	highlight.OutlineColor = color
-	highlight.FillTransparency = 1 - Settings.ESPOpacity / 100
 end
 
 local function RefreshESP()
@@ -426,9 +425,7 @@ local function SetSetting(key, value)
 		if OriginalJumpPower ~= nil then CurrentHumanoid.JumpPower = OriginalJumpPower end
 		if OriginalUseJumpPower ~= nil then CurrentHumanoid.UseJumpPower = OriginalUseJumpPower end
 	end
-	if key == "ShowGlobalESP" or key == "ShowTeamESP" or key == "ESPOpacity" then
-		RefreshESP()
-	end
+	if key == "ShowGlobalESP" or key == "ShowTeamESP" then RefreshESP() end
 	if key == "Invisibility" or key == "InvisibilityMode" then
 		if Settings.Invisibility then StartInvisibility() else ReleaseInvisibility() end
 	end
@@ -448,52 +445,6 @@ local ScreenGui = New("ScreenGui", PlayerGui, {
 	ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
 	IgnoreGuiInset = false
 })
-
-local MouseUnlocked = false
-local PreviousMouseBehavior = Enum.MouseBehavior.Default
-local PreviousMouseIconEnabled = true
-
-local MouseUnlockButton = New("TextButton", ScreenGui, {
-	Name = "MouseUnlockModal",
-	Size = UDim2.fromOffset(1, 1),
-	Position = UDim2.fromOffset(0, 0),
-	BackgroundTransparency = 1,
-	TextTransparency = 1,
-	Text = "",
-	BorderSizePixel = 0,
-	Active = true,
-	Modal = false,
-	AutoButtonColor = false
-})
-
-local function SetMouseUnlocked(state)
-	if MouseUnlocked == state then return end
-
-	MouseUnlocked = state
-
-	if MouseUnlocked then
-		PreviousMouseBehavior = UserInputService.MouseBehavior
-		PreviousMouseIconEnabled = UserInputService.MouseIconEnabled
-
-		MouseUnlockButton.Modal = true
-		UserInputService.MouseBehavior = Enum.MouseBehavior.Default
-		UserInputService.MouseIconEnabled = true
-	else
-		MouseUnlockButton.Modal = false
-		UserInputService.MouseBehavior = PreviousMouseBehavior
-		UserInputService.MouseIconEnabled = PreviousMouseIconEnabled
-	end
-
-	print("[Huss Valley] Mouse:", MouseUnlocked and "UNLOCKED" or "LOCKED")
-end
-
-Connect(RunService.RenderStepped, function()
-	if not alive or not MouseUnlocked then return end
-
-	MouseUnlockButton.Modal = true
-	UserInputService.MouseBehavior = Enum.MouseBehavior.Default
-	UserInputService.MouseIconEnabled = true
-end)
 
 local Main = New("Frame", ScreenGui, {
 	Name = "MainWindow",
@@ -516,8 +467,9 @@ local Header = New("Frame", Main, {
 })
 Label(Header, "Aehmre's Huss Valley Hub", UDim2.new(1, -115, 1, 0), UDim2.fromOffset(15, 0), 14, Colors.White, Enum.Font.GothamBold)
 
-local CloseButton = Button(Header, "X", UDim2.fromOffset(25, 25), UDim2.new(1, -33, 0.5, -12), Color3.fromRGB(52, 26, 31), 12)
-local MinimizeButton = Button(Header, "−", UDim2.fromOffset(25, 25), UDim2.new(1, -64, 0.5, -12), Colors.Input, 15)
+local HeaderButtonSize = UserInputService.TouchEnabled and 32 or 25
+local CloseButton = Button(Header, "X", UDim2.fromOffset(HeaderButtonSize, HeaderButtonSize), UDim2.new(1, -(HeaderButtonSize + 8), 0.5, -HeaderButtonSize / 2), Color3.fromRGB(52, 26, 31), 12)
+local MinimizeButton = Button(Header, "−", UDim2.fromOffset(HeaderButtonSize, HeaderButtonSize), UDim2.new(1, -(HeaderButtonSize * 2 + 14), 0.5, -HeaderButtonSize / 2), Colors.Input, 15)
 
 local Body = New("Frame", Main, {
 	Name = "Content",
@@ -526,9 +478,12 @@ local Body = New("Frame", Main, {
 	BackgroundTransparency = 1
 })
 
-local Sidebar = New("Frame", Body, {
+local Sidebar = New("ScrollingFrame", Body, {
 	Name = "Sidebar",
 	Size = UDim2.new(0, 165, 1, 0),
+	CanvasSize = UDim2.fromOffset(0, 236),
+	ScrollBarThickness = 2,
+	ScrollingDirection = Enum.ScrollingDirection.Y,
 	BackgroundColor3 = Colors.Panel,
 	BorderSizePixel = 0
 })
@@ -731,8 +686,9 @@ local function AddSlider(page, title, description, key, minimum, sliderMaximum, 
 	})
 	Stroke(textbox, Colors.White, 1)
 	New("UIPadding", textbox, {PaddingLeft = UDim.new(0, 8)})
-	local setButton = Button(card, "S", UDim2.fromOffset(25, 25), UDim2.new(1, -65, 0, 52), Colors.Hover, 12, true)
-	local textButton = Button(card, "T", UDim2.fromOffset(25, 25), UDim2.new(1, -40, 0, 52), Colors.Input, 12, true)
+	local modeButtonSize = UserInputService.TouchEnabled and 32 or 25
+	local setButton = Button(card, "S", UDim2.fromOffset(modeButtonSize, modeButtonSize), UDim2.new(1, -(modeButtonSize * 2 + 14), 0, 52), Colors.Hover, 12, true)
+	local textButton = Button(card, "T", UDim2.fromOffset(modeButtonSize, modeButtonSize), UDim2.new(1, -(modeButtonSize + 14), 0, 52), Colors.Input, 12, true)
 	local setStroke = setButton:FindFirstChildOfClass("UIStroke")
 	local textStroke = textButton:FindFirstChildOfClass("UIStroke")
 	setStroke.Color = Colors.White
@@ -827,7 +783,6 @@ AddSlider(CharacterPage, "JumpPower", "S: slider (0-500) | T: exact value (up to
 AddSection(VisualsPage, "VISUALS & ESP")
 AddToggle(VisualsPage, "Show Global ESP", "White highlight for every other player, all teams", "ShowGlobalESP")
 AddToggle(VisualsPage, "Show Team ESP", "Highlight players with their own team colors", "ShowTeamESP")
-AddSlider(VisualsPage, "ESP Opacity", "Adjust ESP visibility (0-100%)", "ESPOpacity", 0, 100, 100)
 AddToggle(VisualsPage, "Invisibility", "Local invisibility test with Air / Bottom mode", "Invisibility")
 AddModeSelector(VisualsPage)
 AddSlider(VisualsPage, "Invisibility Speed", "Move speed in Air and Bottom modes", "InvisSpeed", 1, 100, 200)
@@ -905,7 +860,6 @@ local ConfirmationActive = false
 
 local function WipeHub()
 	if not alive then return end
-	SetMouseUnlocked(false)
 	Settings.Invisibility = false
 	ReleaseInvisibility()
 	Settings.ShowGlobalESP = false
@@ -937,11 +891,53 @@ Connect(DestroyButton.MouseButton1Click, function()
 	end
 end)
 
+local ResizeHandles = {}
+local ExpandedWindowSize = Main.Size
+
+local function GetSafeViewport()
+	local camera = workspace.CurrentCamera
+	local viewport = camera and camera.ViewportSize or Vector2.new(800, 600)
+	local insetTop, insetBottom = GuiService:GetGuiInset()
+	return Vector2.new(math.max(1, viewport.X - insetTop.X - insetBottom.X), math.max(1, viewport.Y - insetTop.Y - insetBottom.Y))
+end
+
+local function UpdateAdaptiveLayout()
+	local width = Main.Size.X.Offset
+	local sidebarWidth = width < 370 and 94 or width < 480 and 112 or 165
+	Sidebar.Size = UDim2.new(0, sidebarWidth, 1, 0)
+	Content.Position = UDim2.fromOffset(sidebarWidth, 0)
+	Content.Size = UDim2.new(1, -sidebarWidth, 1, 0)
+	for _, button in pairs(TabButtons) do
+		button.TextWrapped = width < 480
+		button.TextSize = width < 480 and 9 or 11
+	end
+end
+
+local function FitWindowToViewport()
+	local viewport = GetSafeViewport()
+	local maxWidth = math.max(1, viewport.X - 16)
+	local maxHeight = math.max(1, viewport.Y - 16)
+	local width = math.min(Main.Size.X.Offset, maxWidth)
+	local height = IsMinimized and 42 or math.min(Main.Size.Y.Offset, maxHeight)
+	Main.Size = UDim2.fromOffset(width, height)
+	if IsMinimized then
+		ExpandedWindowSize = UDim2.fromOffset(math.min(ExpandedWindowSize.X.Offset, maxWidth), math.min(ExpandedWindowSize.Y.Offset, maxHeight))
+	end
+	local x = math.clamp(Main.Position.X.Offset, 8, math.max(8, viewport.X - width - 8))
+	local y = math.clamp(Main.Position.Y.Offset, 8, math.max(8, viewport.Y - height - 8))
+	Main.Position = UDim2.fromOffset(x, y)
+	UpdateAdaptiveLayout()
+end
+
 local function SetMinimized(minimized)
+	if minimized == IsMinimized then return end
+	if minimized then ExpandedWindowSize = Main.Size end
 	IsMinimized = minimized
-	Main.Size = minimized and UDim2.fromOffset(550, 42) or UDim2.fromOffset(550, 420)
+	Main.Size = minimized and UDim2.fromOffset(Main.Size.X.Offset, 42) or ExpandedWindowSize
 	Body.Visible = not minimized
 	MinimizeButton.Text = minimized and "+" or "−"
+	for _, handle in pairs(ResizeHandles) do handle.Visible = not minimized end
+	FitWindowToViewport()
 end
 
 Connect(MinimizeButton.MouseButton1Click, function()
@@ -955,52 +951,148 @@ end)
 
 Connect(UserInputService.InputBegan, function(input, processed)
 	if not alive or processed or UserInputService:GetFocusedTextBox() then return end
-
 	if input.KeyCode == Enum.KeyCode.L then
 		Main.Visible = not Main.Visible
-
 		if Main.Visible then
 			NoticeSerial += 1
 			Notification.Visible = false
 		end
-
-	elseif input.KeyCode == Enum.KeyCode.N then
-		SetMouseUnlocked(not MouseUnlocked)
 	end
 end)
 
-local draggingWindow = false
-local draggedInput = nil
-local dragStart = nil
-local windowStart = nil
+local ActiveWindowAction = nil
+local ActivePointer = nil
+local StartPointerPosition = nil
+local StartWindowPosition = nil
+local StartWindowSize = nil
+
+local function BeginWindowAction(action, input)
+	if not alive or (IsMinimized and action ~= "move") then return end
+	if input.UserInputType ~= Enum.UserInputType.MouseButton1 and input.UserInputType ~= Enum.UserInputType.Touch then return end
+	ActiveWindowAction = action
+	ActivePointer = input
+	StartPointerPosition = Vector2.new(input.Position.X, input.Position.Y)
+	StartWindowPosition = Vector2.new(Main.Position.X.Offset, Main.Position.Y.Offset)
+	StartWindowSize = Vector2.new(Main.Size.X.Offset, Main.Size.Y.Offset)
+end
+
+local ResizeRegions = {
+	NW = {UDim2.fromOffset(18, 18), UDim2.fromOffset(0, 0)},
+	N = {UDim2.new(1, -36, 0, 10), UDim2.fromOffset(18, 0)},
+	NE = {UDim2.fromOffset(18, 18), UDim2.new(1, -18, 0, 0)},
+	W = {UDim2.new(0, 10, 1, -36), UDim2.fromOffset(0, 18)},
+	E = {UDim2.new(0, 10, 1, -36), UDim2.new(1, -10, 0, 18)},
+	SW = {UDim2.fromOffset(18, 18), UDim2.new(0, 0, 1, -18)},
+	S = {UDim2.new(1, -36, 0, 10), UDim2.new(0, 18, 1, -10)},
+	SE = {UDim2.fromOffset(18, 18), UDim2.new(1, -18, 1, -18)}
+}
+
+for region, geometry in pairs(ResizeRegions) do
+	local handle = New("TextButton", Main, {
+		Name = "Resize_" .. region,
+		Size = geometry[1],
+		Position = geometry[2],
+		BackgroundTransparency = 1,
+		BorderSizePixel = 0,
+		Text = region == "SE" and "◢" or "",
+		TextSize = 15,
+		Font = Enum.Font.GothamBold,
+		TextColor3 = Colors.Muted,
+		TextXAlignment = Enum.TextXAlignment.Right,
+		TextYAlignment = Enum.TextYAlignment.Bottom,
+		AutoButtonColor = false,
+		Active = true,
+		ZIndex = 90
+	})
+	ResizeHandles[region] = handle
+	Connect(handle.InputBegan, function(input)
+		BeginWindowAction(region, input)
+	end)
+end
 
 Connect(Header.InputBegan, function(input)
-	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-		draggingWindow = true
-		dragStart = input.Position
-		windowStart = Main.Position
-	end
-end)
-
-Connect(Header.InputChanged, function(input)
-	if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
-		draggedInput = input
-	end
+	if ActiveWindowAction then return end
+	local relativeX = input.Position.X - Main.AbsolutePosition.X
+	local relativeY = input.Position.Y - Main.AbsolutePosition.Y
+	if relativeX < 18 or relativeX > Main.AbsoluteSize.X - 18 or relativeY < 10 then return end
+	BeginWindowAction("move", input)
 end)
 
 Connect(UserInputService.InputChanged, function(input)
-	if draggingWindow and input == draggedInput and dragStart and windowStart then
-		local delta = input.Position - dragStart
-		Main.Position = UDim2.new(windowStart.X.Scale, windowStart.X.Offset + delta.X, windowStart.Y.Scale, windowStart.Y.Offset + delta.Y)
+	if not ActiveWindowAction or not StartPointerPosition then return end
+	if ActivePointer.UserInputType == Enum.UserInputType.Touch then
+		if input ~= ActivePointer then return end
+	elseif input.UserInputType ~= Enum.UserInputType.MouseMovement then
+		return
+	end
+
+	local delta = Vector2.new(input.Position.X, input.Position.Y) - StartPointerPosition
+	local viewport = GetSafeViewport()
+	local maxWidth = math.max(1, viewport.X - 16)
+	local maxHeight = math.max(1, viewport.Y - 16)
+	local minWidth = math.min(310, maxWidth)
+	local minHeight = math.min(260, maxHeight)
+	local x, y = StartWindowPosition.X, StartWindowPosition.Y
+	local width, height = StartWindowSize.X, StartWindowSize.Y
+
+	if ActiveWindowAction == "move" then
+		x += delta.X
+		y += delta.Y
+	else
+		local edge = ActiveWindowAction
+		if string.find(edge, "W", 1, true) then
+			width = math.clamp(StartWindowSize.X - delta.X, minWidth, maxWidth)
+			x = StartWindowPosition.X + StartWindowSize.X - width
+		elseif string.find(edge, "E", 1, true) then
+			width = math.clamp(StartWindowSize.X + delta.X, minWidth, maxWidth)
+		end
+		if string.find(edge, "N", 1, true) then
+			height = math.clamp(StartWindowSize.Y - delta.Y, minHeight, maxHeight)
+			y = StartWindowPosition.Y + StartWindowSize.Y - height
+		elseif string.find(edge, "S", 1, true) then
+			height = math.clamp(StartWindowSize.Y + delta.Y, minHeight, maxHeight)
+		end
+	end
+
+	x = math.clamp(x, 8, math.max(8, viewport.X - width - 8))
+	y = math.clamp(y, 8, math.max(8, viewport.Y - height - 8))
+	Main.Position = UDim2.fromOffset(math.floor(x + 0.5), math.floor(y + 0.5))
+	if ActiveWindowAction ~= "move" then
+		Main.Size = UDim2.fromOffset(math.floor(width + 0.5), math.floor(height + 0.5))
+		UpdateAdaptiveLayout()
 	end
 end)
 
 Connect(UserInputService.InputEnded, function(input)
-	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-		draggingWindow = false
+	if not ActiveWindowAction then return end
+	if ActivePointer.UserInputType == Enum.UserInputType.Touch then
+		if input ~= ActivePointer then return end
+	elseif input.UserInputType ~= Enum.UserInputType.MouseButton1 then
+		return
 	end
+	ActiveWindowAction = nil
+	ActivePointer = nil
 end)
 
+local viewport = GetSafeViewport()
+local initialWidth = math.min(550, math.max(1, viewport.X - 16))
+local initialHeight = math.min(420, math.max(1, viewport.Y - 16))
+Main.Size = UDim2.fromOffset(initialWidth, initialHeight)
+Main.Position = UDim2.fromOffset(math.floor((viewport.X - initialWidth) / 2), math.floor((viewport.Y - initialHeight) / 2))
+ExpandedWindowSize = Main.Size
+UpdateAdaptiveLayout()
+
+local camera = workspace.CurrentCamera
+if camera then
+	Connect(camera:GetPropertyChangedSignal("ViewportSize"), FitWindowToViewport)
+end
+Connect(workspace:GetPropertyChangedSignal("CurrentCamera"), function()
+	local currentCamera = workspace.CurrentCamera
+	if currentCamera then
+		Connect(currentCamera:GetPropertyChangedSignal("ViewportSize"), FitWindowToViewport)
+	end
+	FitWindowToViewport()
+end)
 Connect(RunService.Heartbeat, EnforceCharacterValues)
 Connect(LocalPlayer.CharacterAdded, function(character)
 	BindHumanoid(character)
