@@ -3,6 +3,7 @@
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 local HttpService = game:GetService("HttpService")
 local GuiService = game:GetService("GuiService")
@@ -893,6 +894,70 @@ end)
 
 local ResizeHandles = {}
 local ExpandedWindowSize = Main.Size
+local RestoreRectangle = nil
+local IsMaximized = false
+local ActiveWindowAction = nil
+local ActivePointer = nil
+local PointerStart = nil
+local RectangleStart = nil
+local LastPointerPosition = nil
+local LastPointerTime = 0
+local LastHeaderClickTime = 0
+local LastHeaderClickPosition = nil
+local LastMoveVelocity = Vector2.zero
+local ActiveHandle = nil
+local LastLayoutWidth = nil
+local DisplayRectangle = {X = 0, Y = 0, W = 550, H = 420}
+local TargetRectangle = {X = 0, Y = 0, W = 550, H = 420}
+local HideStatusToken = 0
+local HEADER_HEIGHT = 42
+local WINDOW_MARGIN = 8
+local MAGNET_DISTANCE = 15
+local IsTouch = UserInputService.TouchEnabled
+
+local MainBorder = Main:FindFirstChildOfClass("UIStroke")
+local WindowShadow = New("Frame", ScreenGui, {
+	Name = "WindowAmbientShadow",
+	Size = Main.Size,
+	Position = Main.Position,
+	BackgroundTransparency = 1,
+	BorderSizePixel = 0,
+	ZIndex = 1
+})
+Corner(WindowShadow, 13)
+local ShadowStroke = Stroke(WindowShadow, Color3.fromRGB(0, 0, 0), 8)
+ShadowStroke.Transparency = 0.67
+Main.ZIndex = 2
+
+local HeaderAccent = New("Frame", Header, {
+	Name = "MotionAccent",
+	Size = UDim2.new(1, 0, 0, 2),
+	Position = UDim2.new(0, 0, 1, -2),
+	BackgroundColor3 = Colors.Accent,
+	BackgroundTransparency = 0.65,
+	BorderSizePixel = 0,
+	ZIndex = 7
+})
+
+local WindowStatus = New("TextLabel", Main, {
+	Name = "WindowStatus",
+	AnchorPoint = Vector2.new(1, 1),
+	Position = UDim2.new(1, -23, 1, -18),
+	Size = UDim2.fromOffset(168, 25),
+	BackgroundColor3 = Color3.fromRGB(35, 37, 47),
+	BackgroundTransparency = 0.15,
+	BorderSizePixel = 0,
+	TextColor3 = Colors.White,
+	Text = "",
+	TextSize = 10,
+	Font = Enum.Font.GothamBold,
+	TextTransparency = 1,
+	Visible = false,
+	ZIndex = 85
+})
+Corner(WindowStatus, 5)
+local StatusStroke = Stroke(WindowStatus, Colors.Accent, 1)
+StatusStroke.Transparency = 0.4
 
 local function GetSafeViewport()
 	local camera = workspace.CurrentCamera
@@ -901,8 +966,41 @@ local function GetSafeViewport()
 	return Vector2.new(math.max(1, viewport.X - insetTop.X - insetBottom.X), math.max(1, viewport.Y - insetTop.Y - insetBottom.Y))
 end
 
-local function UpdateAdaptiveLayout()
-	local width = Main.Size.X.Offset
+local function GetDimensions(viewport)
+	viewport = viewport or GetSafeViewport()
+	local minWidth = math.min(320, math.max(1, viewport.X - 2 * WINDOW_MARGIN))
+	local minHeight = math.min(265, math.max(1, viewport.Y - 2 * WINDOW_MARGIN))
+	return minWidth, minHeight, math.max(1, viewport.X - 2 * WINDOW_MARGIN), math.max(1, viewport.Y - 2 * WINDOW_MARGIN)
+end
+
+local function CopyRect(rect)
+	return {X = rect.X, Y = rect.Y, W = rect.W, H = rect.H}
+end
+
+local function ClampRect(rect, viewport, minWidth, minHeight)
+	viewport = viewport or GetSafeViewport()
+	local _, _, maxWidth, maxHeight = GetDimensions(viewport)
+	minWidth = math.min(minWidth or 1, maxWidth)
+	minHeight = math.min(minHeight or 1, maxHeight)
+	local width = math.clamp(rect.W, minWidth, maxWidth)
+	local height = math.clamp(rect.H, minHeight, maxHeight)
+	return {
+		X = math.clamp(rect.X, WINDOW_MARGIN, math.max(WINDOW_MARGIN, viewport.X - width - WINDOW_MARGIN)),
+		Y = math.clamp(rect.Y, WINDOW_MARGIN, math.max(WINDOW_MARGIN, viewport.Y - height - WINDOW_MARGIN)),
+		W = width,
+		H = height
+	}
+end
+
+local function SetTargetRectangle(rect, instant)
+	TargetRectangle = CopyRect(rect)
+	if instant then DisplayRectangle = CopyRect(rect) end
+end
+
+local function UpdateAdaptiveLayout(force)
+	local width = DisplayRectangle.W
+	if not force and LastLayoutWidth and math.abs(width - LastLayoutWidth) < 2 then return end
+	LastLayoutWidth = width
 	local sidebarWidth = width < 370 and 94 or width < 480 and 112 or 165
 	Sidebar.Size = UDim2.new(0, sidebarWidth, 1, 0)
 	Content.Position = UDim2.fromOffset(sidebarWidth, 0)
@@ -913,30 +1011,134 @@ local function UpdateAdaptiveLayout()
 	end
 end
 
+local function ShowWindowStatus(message)
+	HideStatusToken += 1
+	WindowStatus.Text = message
+	if not WindowStatus.Visible or WindowStatus.TextTransparency > 0.01 then
+		WindowStatus.Visible = true
+		TweenService:Create(WindowStatus, TweenInfo.new(0.13), {TextTransparency = 0}):Play()
+	end
+end
+
+local function HideWindowStatus()
+	HideStatusToken += 1
+	local token = HideStatusToken
+	TweenService:Create(WindowStatus, TweenInfo.new(0.22), {TextTransparency = 1}):Play()
+	task.delay(0.24, function()
+		if alive and HideStatusToken == token then WindowStatus.Visible = false end
+	end)
+end
+
+local function SetMotionHighlight(enabled)
+	if MainBorder then
+		TweenService:Create(MainBorder, TweenInfo.new(0.16), {
+			Thickness = enabled and 2.2 or 1.5,
+			Color = enabled and Color3.fromRGB(255, 99, 110) or Colors.Accent
+		}):Play()
+	end
+	TweenService:Create(HeaderAccent, TweenInfo.new(0.16), {
+		BackgroundTransparency = enabled and 0.08 or 0.65
+	}):Play()
+	TweenService:Create(ShadowStroke, TweenInfo.new(0.2), {
+		Thickness = enabled and 11 or 8,
+		Transparency = enabled and 0.55 or 0.67
+	}):Play()
+end
+
+local function StopWindowAction()
+	if not ActiveWindowAction then return end
+	local wasAction = ActiveWindowAction
+	local touchFlick = ActivePointer and ActivePointer.UserInputType == Enum.UserInputType.Touch
+	local flickRecent = os.clock() - LastPointerTime < 0.075
+	ActiveWindowAction = nil
+	ActivePointer = nil
+	PointerStart = nil
+	RectangleStart = nil
+	LastPointerPosition = nil
+	ActiveHandle = nil
+	SetMotionHighlight(false)
+	HideWindowStatus()
+	if wasAction == "move" and not IsMaximized then
+		local viewport = GetSafeViewport()
+		local moved = CopyRect(TargetRectangle)
+		if touchFlick and flickRecent then
+			local velocity = LastMoveVelocity * 0.05
+			if velocity.Magnitude > 42 then velocity = velocity.Unit * 42 end
+			moved.X += velocity.X
+			moved.Y += velocity.Y
+		end
+		local clamped = ClampRect(moved, viewport, TargetRectangle.W, TargetRectangle.H)
+		local minX = WINDOW_MARGIN
+		local minY = WINDOW_MARGIN
+		local right = math.max(minX, viewport.X - clamped.W - WINDOW_MARGIN)
+		local bottom = math.max(minY, viewport.Y - clamped.H - WINDOW_MARGIN)
+		if math.abs(clamped.X - minX) < MAGNET_DISTANCE then clamped.X = minX end
+		if math.abs(clamped.Y - minY) < MAGNET_DISTANCE then clamped.Y = minY end
+		if math.abs(clamped.X - right) < MAGNET_DISTANCE then clamped.X = right end
+		if math.abs(clamped.Y - bottom) < MAGNET_DISTANCE then clamped.Y = bottom end
+		SetTargetRectangle(clamped, false)
+	end
+end
+
 local function FitWindowToViewport()
 	local viewport = GetSafeViewport()
-	local maxWidth = math.max(1, viewport.X - 16)
-	local maxHeight = math.max(1, viewport.Y - 16)
-	local width = math.min(Main.Size.X.Offset, maxWidth)
-	local height = IsMinimized and 42 or math.min(Main.Size.Y.Offset, maxHeight)
-	Main.Size = UDim2.fromOffset(width, height)
-	if IsMinimized then
-		ExpandedWindowSize = UDim2.fromOffset(math.min(ExpandedWindowSize.X.Offset, maxWidth), math.min(ExpandedWindowSize.Y.Offset, maxHeight))
+	local minWidth, minHeight, maxWidth, maxHeight = GetDimensions(viewport)
+	if RestoreRectangle then
+		RestoreRectangle = ClampRect(RestoreRectangle, viewport, minWidth, minHeight)
 	end
-	local x = math.clamp(Main.Position.X.Offset, 8, math.max(8, viewport.X - width - 8))
-	local y = math.clamp(Main.Position.Y.Offset, 8, math.max(8, viewport.Y - height - 8))
-	Main.Position = UDim2.fromOffset(x, y)
-	UpdateAdaptiveLayout()
+	if IsMaximized then
+		SetTargetRectangle({X = WINDOW_MARGIN, Y = WINDOW_MARGIN, W = maxWidth, H = IsMinimized and HEADER_HEIGHT or maxHeight})
+	else
+		local current = CopyRect(TargetRectangle)
+		current.W = math.clamp(current.W, minWidth, maxWidth)
+		current.H = IsMinimized and HEADER_HEIGHT or math.clamp(current.H, minHeight, maxHeight)
+		SetTargetRectangle(ClampRect(current, viewport, minWidth, IsMinimized and HEADER_HEIGHT or minHeight))
+	end
+	if IsMinimized then
+		ExpandedWindowSize = UDim2.fromOffset(
+			math.clamp(ExpandedWindowSize.X.Offset, minWidth, maxWidth),
+			math.clamp(ExpandedWindowSize.Y.Offset, minHeight, maxHeight)
+		)
+	end
+	UpdateAdaptiveLayout(true)
+end
+
+local function ToggleMaximize()
+	if not alive or IsMinimized then return end
+	StopWindowAction()
+	local viewport = GetSafeViewport()
+	local minWidth, minHeight, maxWidth, maxHeight = GetDimensions(viewport)
+	if IsMaximized then
+		IsMaximized = false
+		SetTargetRectangle(RestoreRectangle and ClampRect(RestoreRectangle, viewport, minWidth, minHeight) or {
+			X = WINDOW_MARGIN, Y = WINDOW_MARGIN, W = minWidth, H = minHeight
+		})
+		RestoreRectangle = nil
+	else
+		RestoreRectangle = CopyRect(TargetRectangle)
+		IsMaximized = true
+		SetTargetRectangle({X = WINDOW_MARGIN, Y = WINDOW_MARGIN, W = maxWidth, H = maxHeight})
+	end
+	ShowWindowStatus(IsMaximized and "MAXIMIZED" or "RESTORED")
+	local token = HideStatusToken
+	task.delay(0.8, function()
+		if alive and token == HideStatusToken and not ActiveWindowAction then HideWindowStatus() end
+	end)
 end
 
 local function SetMinimized(minimized)
 	if minimized == IsMinimized then return end
-	if minimized then ExpandedWindowSize = Main.Size end
+	StopWindowAction()
+	if minimized then
+		ExpandedWindowSize = UDim2.fromOffset(TargetRectangle.W, TargetRectangle.H)
+	end
 	IsMinimized = minimized
-	Main.Size = minimized and UDim2.fromOffset(Main.Size.X.Offset, 42) or ExpandedWindowSize
 	Body.Visible = not minimized
 	MinimizeButton.Text = minimized and "+" or "−"
 	for _, handle in pairs(ResizeHandles) do handle.Visible = not minimized end
+	local rect = CopyRect(TargetRectangle)
+	rect.H = minimized and HEADER_HEIGHT or ExpandedWindowSize.Y.Offset
+	SetTargetRectangle(rect)
 	FitWindowToViewport()
 end
 
@@ -945,7 +1147,9 @@ Connect(MinimizeButton.MouseButton1Click, function()
 end)
 
 Connect(CloseButton.MouseButton1Click, function()
+	StopWindowAction()
 	Main.Visible = false
+	WindowShadow.Visible = false
 	ShowNotice('The interface is closed. Press "L" to open it again.')
 end)
 
@@ -953,6 +1157,7 @@ Connect(UserInputService.InputBegan, function(input, processed)
 	if not alive or processed or UserInputService:GetFocusedTextBox() then return end
 	if input.KeyCode == Enum.KeyCode.L then
 		Main.Visible = not Main.Visible
+		WindowShadow.Visible = Main.Visible
 		if Main.Visible then
 			NoticeSerial += 1
 			Notification.Visible = false
@@ -960,32 +1165,71 @@ Connect(UserInputService.InputBegan, function(input, processed)
 	end
 end)
 
-local ActiveWindowAction = nil
-local ActivePointer = nil
-local StartPointerPosition = nil
-local StartWindowPosition = nil
-local StartWindowSize = nil
+local ResizeRegions = {
+	NW = {UDim2.fromOffset(IsTouch and 28 or 21, IsTouch and 28 or 21), UDim2.fromOffset(0, 0)},
+	N = {UDim2.new(1, -(IsTouch and 56 or 42), 0, IsTouch and 14 or 9), UDim2.fromOffset(IsTouch and 28 or 21, 0)},
+	NE = {UDim2.fromOffset(IsTouch and 28 or 21, 5), UDim2.new(1, -(IsTouch and 28 or 21), 0, 0)},
+	W = {UDim2.new(0, IsTouch and 14 or 9, 1, -(IsTouch and 56 or 42)), UDim2.fromOffset(0, IsTouch and 28 or 21)},
+	E = {UDim2.new(0, IsTouch and 14 or 9, 1, -(IsTouch and 56 or 42)), UDim2.new(1, -(IsTouch and 14 or 9), 0, IsTouch and 28 or 21)},
+	SW = {UDim2.fromOffset(IsTouch and 28 or 21, IsTouch and 28 or 21), UDim2.new(0, 0, 1, -(IsTouch and 28 or 21))},
+	S = {UDim2.new(1, -(IsTouch and 56 or 42), 0, IsTouch and 14 or 9), UDim2.new(0, IsTouch and 28 or 21, 1, -(IsTouch and 14 or 9))},
+	SE = {UDim2.fromOffset(IsTouch and 28 or 21, IsTouch and 28 or 21), UDim2.new(1, -(IsTouch and 28 or 21), 1, -(IsTouch and 28 or 21))}
+}
 
-local function BeginWindowAction(action, input)
-	if not alive or (IsMinimized and action ~= "move") then return end
-	if input.UserInputType ~= Enum.UserInputType.MouseButton1 and input.UserInputType ~= Enum.UserInputType.Touch then return end
-	ActiveWindowAction = action
-	ActivePointer = input
-	StartPointerPosition = Vector2.new(input.Position.X, input.Position.Y)
-	StartWindowPosition = Vector2.new(Main.Position.X.Offset, Main.Position.Y.Offset)
-	StartWindowSize = Vector2.new(Main.Size.X.Offset, Main.Size.Y.Offset)
+local ResizeDecorations = {}
+for _, edge in ipairs({"N", "S", "E", "W"}) do
+	local horizontal = edge == "N" or edge == "S"
+	local side = New("Frame", Main, {
+		Name = "ResizeGlow_" .. edge,
+		Size = horizontal and UDim2.new(1, -18, 0, 3) or UDim2.new(0, 3, 1, -18),
+		Position = edge == "N" and UDim2.fromOffset(9, 0)
+			or edge == "S" and UDim2.new(0, 9, 1, -3)
+			or edge == "W" and UDim2.fromOffset(0, 9)
+			or UDim2.new(1, -3, 0, 9),
+		BackgroundColor3 = Colors.Accent,
+		BackgroundTransparency = 1,
+		BorderSizePixel = 0,
+		ZIndex = 79
+	})
+	ResizeDecorations[edge] = side
 end
 
-local ResizeRegions = {
-	NW = {UDim2.fromOffset(18, 18), UDim2.fromOffset(0, 0)},
-	N = {UDim2.new(1, -36, 0, 10), UDim2.fromOffset(18, 0)},
-	NE = {UDim2.fromOffset(18, 18), UDim2.new(1, -18, 0, 0)},
-	W = {UDim2.new(0, 10, 1, -36), UDim2.fromOffset(0, 18)},
-	E = {UDim2.new(0, 10, 1, -36), UDim2.new(1, -10, 0, 18)},
-	SW = {UDim2.fromOffset(18, 18), UDim2.new(0, 0, 1, -18)},
-	S = {UDim2.new(1, -36, 0, 10), UDim2.new(0, 18, 1, -10)},
-	SE = {UDim2.fromOffset(18, 18), UDim2.new(1, -18, 1, -18)}
-}
+local function SetResizeGlow(region)
+	for edge, decoration in pairs(ResizeDecorations) do
+		local show = region and string.find(region, edge, 1, true) ~= nil
+		TweenService:Create(decoration, TweenInfo.new(0.16), {
+			BackgroundTransparency = show and 0.08 or 1
+		}):Play()
+	end
+end
+
+local function BeginWindowAction(action, input)
+	if not alive or not Main.Visible or ActiveWindowAction or (IsMinimized and action ~= "move") then return end
+	if input.UserInputType ~= Enum.UserInputType.MouseButton1 and input.UserInputType ~= Enum.UserInputType.Touch then return end
+	local pos = Vector2.new(input.Position.X, input.Position.Y)
+	if action == "move" then
+		local timeNow = os.clock()
+		if LastHeaderClickPosition and timeNow - LastHeaderClickTime <= 0.31 and (pos - LastHeaderClickPosition).Magnitude <= 18 then
+			LastHeaderClickTime = 0
+			LastHeaderClickPosition = nil
+			ToggleMaximize()
+			return
+		end
+		LastHeaderClickTime = timeNow
+		LastHeaderClickPosition = pos
+	end
+	ActiveWindowAction = action
+	ActivePointer = input
+	PointerStart = pos
+	RectangleStart = CopyRect(TargetRectangle)
+	LastPointerPosition = pos
+	LastPointerTime = os.clock()
+	LastMoveVelocity = Vector2.zero
+	ActiveHandle = ResizeHandles[action]
+	SetMotionHighlight(true)
+	SetResizeGlow(action == "move" and nil or action)
+	ShowWindowStatus(action == "move" and "MOVE WINDOW" or string.format("%d × %d", math.floor(TargetRectangle.W), math.floor(TargetRectangle.H)))
+end
 
 for region, geometry in pairs(ResizeRegions) do
 	local handle = New("TextButton", Main, {
@@ -995,7 +1239,7 @@ for region, geometry in pairs(ResizeRegions) do
 		BackgroundTransparency = 1,
 		BorderSizePixel = 0,
 		Text = region == "SE" and "◢" or "",
-		TextSize = 15,
+		TextSize = IsTouch and 19 or 15,
 		Font = Enum.Font.GothamBold,
 		TextColor3 = Colors.Muted,
 		TextXAlignment = Enum.TextXAlignment.Right,
@@ -1005,87 +1249,171 @@ for region, geometry in pairs(ResizeRegions) do
 		ZIndex = 90
 	})
 	ResizeHandles[region] = handle
-	Connect(handle.InputBegan, function(input)
-		BeginWindowAction(region, input)
+	Connect(handle.InputBegan, function(input) BeginWindowAction(region, input) end)
+	Connect(handle.MouseEnter, function()
+		if not ActiveWindowAction then SetResizeGlow(region) end
+	end)
+	Connect(handle.MouseLeave, function()
+		if not ActiveWindowAction then SetResizeGlow(nil) end
 	end)
 end
+
+local TopRightSideHandle = New("TextButton", Main, {
+	Name = "Resize_NE_SideGrip",
+	Size = UDim2.fromOffset(IsTouch and 14 or 9, IsTouch and 28 or 22),
+	Position = UDim2.new(1, -(IsTouch and 14 or 9), 0, 38),
+	BackgroundTransparency = 1,
+	BorderSizePixel = 0,
+	Text = "",
+	AutoButtonColor = false,
+	Active = true,
+	ZIndex = 90
+})
+ResizeHandles.NESideGrip = TopRightSideHandle
+Connect(TopRightSideHandle.InputBegan, function(input)
+	BeginWindowAction("NE", input)
+end)
+Connect(TopRightSideHandle.MouseEnter, function()
+	if not ActiveWindowAction then SetResizeGlow("NE") end
+end)
+Connect(TopRightSideHandle.MouseLeave, function()
+	if not ActiveWindowAction then SetResizeGlow(nil) end
+end)
 
 Connect(Header.InputBegan, function(input)
 	if ActiveWindowAction then return end
 	local relativeX = input.Position.X - Main.AbsolutePosition.X
 	local relativeY = input.Position.Y - Main.AbsolutePosition.Y
-	if relativeX < 18 or relativeX > Main.AbsoluteSize.X - 18 or relativeY < 10 then return end
+	local controlsWidth = HeaderButtonSize * 2 + 28
+	if relativeX < (IsTouch and 28 or 21) or relativeX >= Main.AbsoluteSize.X - controlsWidth or relativeY < (IsTouch and 15 or 10) then return end
 	BeginWindowAction("move", input)
 end)
 
+local function SnapMovement(rect, viewport)
+	local right = viewport.X - rect.W - WINDOW_MARGIN
+	local bottom = viewport.Y - rect.H - WINDOW_MARGIN
+	if math.abs(rect.X - WINDOW_MARGIN) < MAGNET_DISTANCE then rect.X = WINDOW_MARGIN end
+	if math.abs(rect.Y - WINDOW_MARGIN) < MAGNET_DISTANCE then rect.Y = WINDOW_MARGIN end
+	if math.abs(rect.X - right) < MAGNET_DISTANCE then rect.X = right end
+	if math.abs(rect.Y - bottom) < MAGNET_DISTANCE then rect.Y = bottom end
+	return rect
+end
+
+local function ApplyPointerMovement(input)
+	if not ActiveWindowAction or not PointerStart or not RectangleStart then return end
+	local pos = Vector2.new(input.Position.X, input.Position.Y)
+	local delta = pos - PointerStart
+	local viewport = GetSafeViewport()
+	local minWidth, minHeight, maxWidth, maxHeight = GetDimensions(viewport)
+	local rect = CopyRect(RectangleStart)
+	local action = ActiveWindowAction
+
+	if action == "move" and IsMaximized and delta.Magnitude >= 8 then
+		local relative = math.clamp((PointerStart.X - RectangleStart.X) / math.max(1, RectangleStart.W), 0.16, 0.84)
+		local original = RestoreRectangle or {X = 50, Y = 50, W = math.min(550, maxWidth), H = math.min(420, maxHeight)}
+		local restored = ClampRect({
+			X = pos.X - original.W * relative,
+			Y = math.max(WINDOW_MARGIN, pos.Y - 22),
+			W = original.W,
+			H = original.H
+		}, viewport, minWidth, minHeight)
+		IsMaximized = false
+		RestoreRectangle = nil
+		RectangleStart = CopyRect(restored)
+		PointerStart = pos
+		SetTargetRectangle(restored)
+		return
+	end
+
+	if action == "move" then
+		rect.X += delta.X
+		rect.Y += delta.Y
+		rect = SnapMovement(rect, viewport)
+	else
+		local oldRight = rect.X + rect.W
+		local oldBottom = rect.Y + rect.H
+		if string.find(action, "W", 1, true) then
+			local left = math.clamp(rect.X + delta.X, WINDOW_MARGIN, oldRight - minWidth)
+			rect.X = left
+			rect.W = oldRight - left
+		elseif string.find(action, "E", 1, true) then
+			rect.W = math.clamp(rect.W + delta.X, minWidth, math.min(maxWidth, viewport.X - rect.X - WINDOW_MARGIN))
+		end
+		if string.find(action, "N", 1, true) then
+			local top = math.clamp(rect.Y + delta.Y, WINDOW_MARGIN, oldBottom - minHeight)
+			rect.Y = top
+			rect.H = oldBottom - top
+		elseif string.find(action, "S", 1, true) then
+			rect.H = math.clamp(rect.H + delta.Y, minHeight, math.min(maxHeight, viewport.Y - rect.Y - WINDOW_MARGIN))
+		end
+		ShowWindowStatus(string.format("%d × %d", math.floor(rect.W + 0.5), math.floor(rect.H + 0.5)))
+	end
+
+	rect = ClampRect(rect, viewport, action == "move" and rect.W or minWidth, action == "move" and rect.H or minHeight)
+	local now = os.clock()
+	local elapsed = math.max(now - LastPointerTime, 0.001)
+	LastMoveVelocity = (pos - LastPointerPosition) / elapsed
+	LastPointerPosition = pos
+	LastPointerTime = now
+	SetTargetRectangle(rect)
+end
+
 Connect(UserInputService.InputChanged, function(input)
-	if not ActiveWindowAction or not StartPointerPosition then return end
+	if not ActiveWindowAction or not ActivePointer then return end
 	if ActivePointer.UserInputType == Enum.UserInputType.Touch then
 		if input ~= ActivePointer then return end
 	elseif input.UserInputType ~= Enum.UserInputType.MouseMovement then
 		return
 	end
-
-	local delta = Vector2.new(input.Position.X, input.Position.Y) - StartPointerPosition
-	local viewport = GetSafeViewport()
-	local maxWidth = math.max(1, viewport.X - 16)
-	local maxHeight = math.max(1, viewport.Y - 16)
-	local minWidth = math.min(310, maxWidth)
-	local minHeight = math.min(260, maxHeight)
-	local x, y = StartWindowPosition.X, StartWindowPosition.Y
-	local width, height = StartWindowSize.X, StartWindowSize.Y
-
-	if ActiveWindowAction == "move" then
-		x += delta.X
-		y += delta.Y
-	else
-		local edge = ActiveWindowAction
-		if string.find(edge, "W", 1, true) then
-			width = math.clamp(StartWindowSize.X - delta.X, minWidth, maxWidth)
-			x = StartWindowPosition.X + StartWindowSize.X - width
-		elseif string.find(edge, "E", 1, true) then
-			width = math.clamp(StartWindowSize.X + delta.X, minWidth, maxWidth)
-		end
-		if string.find(edge, "N", 1, true) then
-			height = math.clamp(StartWindowSize.Y - delta.Y, minHeight, maxHeight)
-			y = StartWindowPosition.Y + StartWindowSize.Y - height
-		elseif string.find(edge, "S", 1, true) then
-			height = math.clamp(StartWindowSize.Y + delta.Y, minHeight, maxHeight)
-		end
-	end
-
-	x = math.clamp(x, 8, math.max(8, viewport.X - width - 8))
-	y = math.clamp(y, 8, math.max(8, viewport.Y - height - 8))
-	Main.Position = UDim2.fromOffset(math.floor(x + 0.5), math.floor(y + 0.5))
-	if ActiveWindowAction ~= "move" then
-		Main.Size = UDim2.fromOffset(math.floor(width + 0.5), math.floor(height + 0.5))
-		UpdateAdaptiveLayout()
-	end
+	ApplyPointerMovement(input)
 end)
 
 Connect(UserInputService.InputEnded, function(input)
-	if not ActiveWindowAction then return end
+	if not ActiveWindowAction or not ActivePointer then return end
 	if ActivePointer.UserInputType == Enum.UserInputType.Touch then
 		if input ~= ActivePointer then return end
 	elseif input.UserInputType ~= Enum.UserInputType.MouseButton1 then
 		return
 	end
-	ActiveWindowAction = nil
-	ActivePointer = nil
+	StopWindowAction()
+	SetResizeGlow(nil)
 end)
 
 local viewport = GetSafeViewport()
 local initialWidth = math.min(550, math.max(1, viewport.X - 16))
 local initialHeight = math.min(420, math.max(1, viewport.Y - 16))
-Main.Size = UDim2.fromOffset(initialWidth, initialHeight)
-Main.Position = UDim2.fromOffset(math.floor((viewport.X - initialWidth) / 2), math.floor((viewport.Y - initialHeight) / 2))
-ExpandedWindowSize = Main.Size
-UpdateAdaptiveLayout()
+local initial = {
+	X = math.floor((viewport.X - initialWidth) * 0.5),
+	Y = math.floor((viewport.Y - initialHeight) * 0.5),
+	W = initialWidth,
+	H = initialHeight
+}
+SetTargetRectangle(initial, true)
+ExpandedWindowSize = UDim2.fromOffset(initialWidth, initialHeight)
+UpdateAdaptiveLayout(true)
+
+Connect(RunService.RenderStepped, function(dt)
+	if not alive then return end
+	local speed = ActiveWindowAction and 35 or 18
+	local alpha = 1 - math.exp(-math.min(dt, 0.1) * speed)
+	local shown = DisplayRectangle
+	local destination = TargetRectangle
+	shown.X += (destination.X - shown.X) * alpha
+	shown.Y += (destination.Y - shown.Y) * alpha
+	shown.W += (destination.W - shown.W) * alpha
+	shown.H += (destination.H - shown.H) * alpha
+	for _, key in ipairs({"X", "Y", "W", "H"}) do
+		if math.abs(shown[key] - destination[key]) < 0.07 then shown[key] = destination[key] end
+	end
+	Main.Position = UDim2.fromOffset(math.floor(shown.X + 0.5), math.floor(shown.Y + 0.5))
+	Main.Size = UDim2.fromOffset(math.floor(shown.W + 0.5), math.floor(shown.H + 0.5))
+	WindowShadow.Position = UDim2.fromOffset(math.floor(shown.X + 0.5), math.floor(shown.Y + 0.5))
+	WindowShadow.Size = UDim2.fromOffset(math.floor(shown.W + 0.5), math.floor(shown.H + 0.5))
+	UpdateAdaptiveLayout(false)
+end)
 
 local camera = workspace.CurrentCamera
-if camera then
-	Connect(camera:GetPropertyChangedSignal("ViewportSize"), FitWindowToViewport)
-end
+if camera then Connect(camera:GetPropertyChangedSignal("ViewportSize"), FitWindowToViewport) end
 Connect(workspace:GetPropertyChangedSignal("CurrentCamera"), function()
 	local currentCamera = workspace.CurrentCamera
 	if currentCamera then
