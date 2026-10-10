@@ -447,6 +447,57 @@ local ScreenGui = New("ScreenGui", PlayerGui, {
 	IgnoreGuiInset = false
 })
 
+local MouseUnlocked = false
+local PreviousMouseBehavior = Enum.MouseBehavior.Default
+local PreviousMouseIconEnabled = true
+
+local MouseUnlockModal = New("TextButton", ScreenGui, {
+	Name = "MouseUnlockModal",
+	Size = UDim2.fromOffset(1, 1),
+	Position = UDim2.fromOffset(0, 0),
+	BackgroundTransparency = 1,
+	TextTransparency = 1,
+	Text = "",
+	BorderSizePixel = 0,
+	Active = true,
+	Selectable = false,
+	AutoButtonColor = false,
+	Visible = true,
+	Modal = false
+})
+
+local function SetMouseUnlocked(enabled)
+	enabled = enabled == true
+	if MouseUnlocked == enabled then return end
+
+	if enabled then
+		PreviousMouseBehavior = UserInputService.MouseBehavior
+		PreviousMouseIconEnabled = UserInputService.MouseIconEnabled
+		MouseUnlocked = true
+		MouseUnlockModal.Modal = true
+		UserInputService.MouseBehavior = Enum.MouseBehavior.Default
+		UserInputService.MouseIconEnabled = true
+	else
+		MouseUnlocked = false
+		MouseUnlockModal.Modal = false
+		UserInputService.MouseBehavior = PreviousMouseBehavior
+		UserInputService.MouseIconEnabled = PreviousMouseIconEnabled
+	end
+
+	print("[Huss Valley] Mouse " .. (MouseUnlocked and "UNLOCKED" or "RESTORED") .. " | N = toggle")
+end
+
+Connect(RunService.RenderStepped, function()
+	if not alive or not MouseUnlocked or not MouseUnlockModal.Parent then return end
+	if not MouseUnlockModal.Modal then MouseUnlockModal.Modal = true end
+	if UserInputService.MouseBehavior ~= Enum.MouseBehavior.Default then
+		UserInputService.MouseBehavior = Enum.MouseBehavior.Default
+	end
+	if not UserInputService.MouseIconEnabled then
+		UserInputService.MouseIconEnabled = true
+	end
+end)
+
 local Main = New("Frame", ScreenGui, {
 	Name = "MainWindow",
 	Size = UDim2.fromOffset(550, 420),
@@ -861,6 +912,7 @@ local ConfirmationActive = false
 
 local function WipeHub()
 	if not alive then return end
+	SetMouseUnlocked(false)
 	Settings.Invisibility = false
 	ReleaseInvisibility()
 	Settings.ShowGlobalESP = false
@@ -1155,7 +1207,9 @@ end)
 
 Connect(UserInputService.InputBegan, function(input, processed)
 	if not alive or processed or UserInputService:GetFocusedTextBox() then return end
-	if input.KeyCode == Enum.KeyCode.L then
+	if input.KeyCode == Enum.KeyCode.N then
+		SetMouseUnlocked(not MouseUnlocked)
+	elseif input.KeyCode == Enum.KeyCode.L then
 		Main.Visible = not Main.Visible
 		WindowShadow.Visible = Main.Visible
 		if Main.Visible then
