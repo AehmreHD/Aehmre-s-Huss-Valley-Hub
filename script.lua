@@ -1,4 +1,4 @@
--- // AEHMRE'S HUSS VALLEY HUB - CAMERA FOV //
+-- // AEHMRE'S HUSS VALLEY HUB - PREMIUM CONTROL CENTER //
 -- MADE BY: Emre_31er
 
 local Players = game:GetService("Players")
@@ -18,6 +18,7 @@ local Settings = {
 	ApplyJumpPower = false,
 	JumpPower = 50,
 	FieldOfView = 70,
+	ESPOpacity = 35,
 	InvisSpeed = 12,
 	ShowGlobalESP = false,
 	ShowTeamESP = false,
@@ -48,21 +49,21 @@ local OriginalWalkSpeed = nil
 local OriginalJumpPower = nil
 local OriginalUseJumpPower = nil
 local OriginalFieldOfView = workspace.CurrentCamera and workspace.CurrentCamera.FieldOfView or 70
-local VisibleTab = "Character"
+local VisibleTab = "Overview"
 local IsMinimized = false
 local NoticeSerial = 0
 
 local Colors = {
-	Main = Color3.fromRGB(9, 10, 13),
-	Panel = Color3.fromRGB(15, 16, 21),
-	Card = Color3.fromRGB(21, 22, 28),
-	Hover = Color3.fromRGB(31, 32, 40),
-	Input = Color3.fromRGB(35, 37, 45),
-	Border = Color3.fromRGB(67, 69, 80),
-	Accent = Color3.fromRGB(224, 49, 64),
-	White = Color3.fromRGB(245, 246, 249),
-	Muted = Color3.fromRGB(158, 161, 173),
-	Green = Color3.fromRGB(72, 219, 126)
+	Main = Color3.fromRGB(8, 10, 16),
+	Panel = Color3.fromRGB(14, 17, 25),
+	Card = Color3.fromRGB(23, 26, 36),
+	Hover = Color3.fromRGB(34, 39, 52),
+	Input = Color3.fromRGB(40, 45, 59),
+	Border = Color3.fromRGB(67, 74, 96),
+	Accent = Color3.fromRGB(236, 65, 88),
+	White = Color3.fromRGB(246, 247, 252),
+	Muted = Color3.fromRGB(162, 169, 190),
+	Green = Color3.fromRGB(72, 224, 157)
 }
 
 local function Connect(signal, callback, registry)
@@ -234,7 +235,7 @@ local function UpdateESP(player)
 			Name = "HussValleyCharacterESP",
 			Adornee = character,
 			DepthMode = Enum.HighlightDepthMode.AlwaysOnTop,
-			FillTransparency = 0.65,
+			FillTransparency = 1 - math.clamp(Settings.ESPOpacity, 0, 100) / 100,
 			OutlineTransparency = 0
 		})
 		ESPHighlights[player] = highlight
@@ -242,6 +243,7 @@ local function UpdateESP(player)
 	local color = Settings.ShowGlobalESP and Colors.White or (player.Neutral and Colors.White or player.TeamColor.Color)
 	highlight.FillColor = color
 	highlight.OutlineColor = color
+	highlight.FillTransparency = 1 - math.clamp(Settings.ESPOpacity, 0, 100) / 100
 end
 
 local function RefreshESP()
@@ -439,7 +441,7 @@ local function SetSetting(key, value)
 		if OriginalJumpPower ~= nil then CurrentHumanoid.JumpPower = OriginalJumpPower end
 		if OriginalUseJumpPower ~= nil then CurrentHumanoid.UseJumpPower = OriginalUseJumpPower end
 	end
-	if key == "ShowGlobalESP" or key == "ShowTeamESP" then RefreshESP() end
+	if key == "ShowGlobalESP" or key == "ShowTeamESP" or key == "ESPOpacity" then RefreshESP() end
 	if key == "Invisibility" or key == "InvisibilityMode" then
 		if Settings.Invisibility then StartInvisibility() else ReleaseInvisibility() end
 	end
@@ -453,7 +455,10 @@ local function SetSetting(key, value)
 end
 
 local Existing = PlayerGui:FindFirstChild("AehmresHussValleyHub")
-if Existing then Existing:Destroy() end
+if Existing then
+	Existing:SetAttribute("HussValleyShuttingDown", true)
+	if Existing.Parent then Existing:Destroy() end
+end
 
 local ScreenGui = New("ScreenGui", PlayerGui, {
 	Name = "AehmresHussValleyHub",
@@ -516,92 +521,203 @@ end)
 
 local Main = New("Frame", ScreenGui, {
 	Name = "MainWindow",
-	Size = UDim2.fromOffset(550, 420),
-	Position = UDim2.new(0.5, -275, 0.5, -210),
+	Size = UDim2.fromOffset(640, 490),
+	Position = UDim2.new(0.5, -320, 0.5, -245),
 	BackgroundColor3 = Colors.Main,
 	BorderSizePixel = 0,
 	ClipsDescendants = true,
-	Active = true
+	Active = true,
+	ZIndex = 2
 })
-Corner(Main, 9)
-Stroke(Main, Colors.Accent, 1.5)
+Corner(Main, 12)
+Stroke(Main, Colors.Accent, 1.3)
+New("UIGradient", Main, {
+	Rotation = 120,
+	Color = ColorSequence.new({ColorSequenceKeypoint.new(0, Colors.Main), ColorSequenceKeypoint.new(1, Color3.fromRGB(17, 19, 27))})
+})
 
+local HeaderHeight = 56
 local Header = New("Frame", Main, {
 	Name = "Header",
-	Size = UDim2.new(1, 0, 0, 42),
+	Size = UDim2.new(1, 0, 0, HeaderHeight),
 	BackgroundColor3 = Colors.Panel,
 	BorderSizePixel = 0,
-	Active = true
+	Active = true,
+	ZIndex = 5
 })
-Label(Header, "Aehmre's Huss Valley Hub", UDim2.new(1, -115, 1, 0), UDim2.fromOffset(15, 0), 14, Colors.White, Enum.Font.GothamBold)
+New("UIGradient", Header, {
+	Rotation = 0,
+	Color = ColorSequence.new(Color3.fromRGB(26, 29, 39), Color3.fromRGB(16, 17, 23))
+})
 
-local HeaderButtonSize = UserInputService.TouchEnabled and 32 or 25
-local CloseButton = Button(Header, "X", UDim2.fromOffset(HeaderButtonSize, HeaderButtonSize), UDim2.new(1, -(HeaderButtonSize + 8), 0.5, -HeaderButtonSize / 2), Color3.fromRGB(52, 26, 31), 12)
-local MinimizeButton = Button(Header, "−", UDim2.fromOffset(HeaderButtonSize, HeaderButtonSize), UDim2.new(1, -(HeaderButtonSize * 2 + 14), 0.5, -HeaderButtonSize / 2), Colors.Input, 15)
+local BrandIcon = New("Frame", Header, {
+	Name = "BrandIcon",
+	Size = UDim2.fromOffset(34, 34),
+	Position = UDim2.fromOffset(13, 11),
+	BackgroundColor3 = Colors.Accent,
+	BorderSizePixel = 0,
+	ZIndex = 6
+})
+Corner(BrandIcon, 8)
+New("UIGradient", BrandIcon, {
+	Rotation = 45,
+	Color = ColorSequence.new(Colors.Accent, Color3.fromRGB(137, 28, 54))
+})
+local Mark = Label(BrandIcon, "HV", UDim2.fromScale(1, 1), UDim2.fromOffset(0, 0), 13, Colors.White, Enum.Font.GothamBlack)
+Mark.TextXAlignment = Enum.TextXAlignment.Center
+Mark.ZIndex = 7
+
+local MainTitle = Label(Header, "Aehmre's Huss Valley Hub", UDim2.new(0, 246, 0, 22), UDim2.fromOffset(57, 8), 13, Colors.White, Enum.Font.GothamBlack)
+MainTitle.ZIndex = 6
+local MainSubtitle = Label(Header, "PREMIUM CLIENT CONTROL CENTER  /  V2", UDim2.new(0, 220, 0, 16), UDim2.fromOffset(58, 30), 9, Colors.Muted, Enum.Font.GothamBold)
+MainSubtitle.ZIndex = 6
+
+local HeaderStatus = Label(Header, "●  CLIENT ACTIVE", UDim2.fromOffset(124, 24), UDim2.new(1, -221, 0.5, -12), 9, Colors.Green, Enum.Font.GothamBold)
+HeaderStatus.TextXAlignment = Enum.TextXAlignment.Center
+HeaderStatus.ZIndex = 6
+
+local HeaderButtonSize = UserInputService.TouchEnabled and 32 or 27
+local CloseButton = Button(Header, "X", UDim2.fromOffset(HeaderButtonSize, HeaderButtonSize), UDim2.new(1, -(HeaderButtonSize + 10), 0.5, -HeaderButtonSize / 2), Color3.fromRGB(65, 29, 41), 18)
+local MinimizeButton = Button(Header, "−", UDim2.fromOffset(HeaderButtonSize, HeaderButtonSize), UDim2.new(1, -(HeaderButtonSize * 2 + 17), 0.5, -HeaderButtonSize / 2), Colors.Input, 18)
+CloseButton.ZIndex = 8
+MinimizeButton.ZIndex = 8
 
 local Body = New("Frame", Main, {
 	Name = "Content",
-	Size = UDim2.new(1, 0, 1, -42),
-	Position = UDim2.fromOffset(0, 42),
-	BackgroundTransparency = 1
+	Size = UDim2.new(1, 0, 1, -HeaderHeight),
+	Position = UDim2.fromOffset(0, HeaderHeight),
+	BackgroundTransparency = 1,
+	ZIndex = 2
 })
 
 local Sidebar = New("ScrollingFrame", Body, {
 	Name = "Sidebar",
-	Size = UDim2.new(0, 165, 1, 0),
-	CanvasSize = UDim2.fromOffset(0, 295),
+	Size = UDim2.new(0, 184, 1, 0),
+	CanvasSize = UDim2.new(0, 0, 0, 480),
 	ScrollBarThickness = 2,
+	ScrollBarImageColor3 = Colors.Accent,
 	ScrollingDirection = Enum.ScrollingDirection.Y,
 	BackgroundColor3 = Colors.Panel,
-	BorderSizePixel = 0
+	BorderSizePixel = 0,
+	ZIndex = 3
 })
+New("UIGradient", Sidebar, {
+	Rotation = 90,
+	Color = ColorSequence.new(Color3.fromRGB(16, 18, 26), Color3.fromRGB(10, 12, 18))
+})
+local SidebarRule = New("Frame", Sidebar, {
+	Size = UDim2.new(1, -24, 0, 1),
+	Position = UDim2.fromOffset(12, 93),
+	BackgroundColor3 = Colors.Border,
+	BorderSizePixel = 0,
+	ZIndex = 3
+})
+local SideTitle = Label(Sidebar, "HUSS VALLEY", UDim2.new(1, -24, 0, 29), UDim2.fromOffset(14, 15), 18, Colors.White, Enum.Font.GothamBlack)
+SideTitle.ZIndex = 4
+local SideSubtitle = Label(Sidebar, "DEVELOPER TOOLS  /  CLIENT", UDim2.new(1, -24, 0, 18), UDim2.fromOffset(14, 48), 9, Colors.Muted, Enum.Font.GothamBold)
+SideSubtitle.ZIndex = 4
+local SideCaption = Label(Sidebar, "NAVIGATION", UDim2.new(1, -24, 0, 23), UDim2.fromOffset(14, 106), 9, Colors.Muted, Enum.Font.GothamBold)
+SideCaption.ZIndex = 4
 
-local SidebarTitle = Label(Sidebar, "NAVIGATION", UDim2.new(1, -24, 0, 30), UDim2.fromOffset(12, 10), 10, Colors.Muted, Enum.Font.GothamBold)
+local SidebarFooter = New("Frame", Sidebar, {
+	Name = "SidebarMonitor",
+	Size = UDim2.new(1, -20, 0, 76),
+	Position = UDim2.fromOffset(10, 390),
+	BackgroundColor3 = Colors.Card,
+	BorderSizePixel = 0,
+	ZIndex = 4
+})
+Corner(SidebarFooter, 7)
+Stroke(SidebarFooter, Colors.Border, 1)
+local FooterHeading = Label(SidebarFooter, "LIVE TELEMETRY", UDim2.new(1, -16, 0, 17), UDim2.fromOffset(8, 7), 9, Colors.Muted, Enum.Font.GothamBold)
+local FooterLine1 = Label(SidebarFooter, "SPEED   --", UDim2.new(1, -16, 0, 19), UDim2.fromOffset(8, 26), 10, Colors.White, Enum.Font.Code)
+local FooterLine2 = Label(SidebarFooter, "ESP     --", UDim2.new(1, -16, 0, 19), UDim2.fromOffset(8, 45), 10, Colors.Green, Enum.Font.Code)
 
 local Content = New("Frame", Body, {
 	Name = "PageContainer",
-	Position = UDim2.fromOffset(165, 0),
-	Size = UDim2.new(1, -165, 1, 0),
-	BackgroundTransparency = 1
+	Position = UDim2.fromOffset(184, 0),
+	Size = UDim2.new(1, -184, 1, 0),
+	BackgroundTransparency = 1,
+	ZIndex = 3
 })
 
 local Notification = New("Frame", ScreenGui, {
 	Name = "InterfaceClosedNotification",
 	AnchorPoint = Vector2.new(1, 1),
-	Size = UDim2.fromOffset(340, 76),
-	Position = UDim2.new(1, -18, 1, -18),
+	Size = UDim2.fromOffset(355, 78),
+	Position = UDim2.new(1, -16, 1, -16),
 	BackgroundColor3 = Colors.Panel,
 	BorderSizePixel = 0,
 	Visible = false,
-	ZIndex = 30
+	ZIndex = 101
 })
-Corner(Notification, 7)
+Corner(Notification, 10)
 Stroke(Notification, Colors.Green, 1.5)
+local NoticeDot = Label(Notification, "●", UDim2.fromOffset(23, 23), UDim2.fromOffset(13, 19), 14, Colors.Green, Enum.Font.GothamBold)
+NoticeDot.ZIndex = 102
+local NoticeText = Label(Notification, 'HUB HIDDEN  /  Press L to reopen the interface.', UDim2.new(1, -81, 1, -14), UDim2.fromOffset(39, 7), 11, Colors.White, Enum.Font.GothamSemibold)
+NoticeText.TextWrapped = true
+NoticeText.TextTruncate = Enum.TextTruncate.None
+NoticeText.ZIndex = 102
+local NoticeClose = Button(Notification, "×", UDim2.fromOffset(26, 26), UDim2.new(1, -33, 0, 8), Colors.Input, 15)
+NoticeClose.ZIndex = 104
 
 InvisibilityWarning = New("TextLabel", ScreenGui, {
 	Name = "AirInvisibilityWarning",
 	AnchorPoint = Vector2.new(0.5, 1),
-	Size = UDim2.fromOffset(300, 35),
+	Size = UDim2.fromOffset(310, 40),
 	Position = UDim2.new(0.5, 0, 0.87, 0),
 	BackgroundTransparency = 1,
 	Text = "⚠️ YOU ARE VISIBLE ⚠️",
-	TextColor3 = Color3.fromRGB(255, 230, 35),
-	TextStrokeTransparency = 0.3,
-	TextSize = 21,
+	TextColor3 = Color3.fromRGB(255, 225, 50),
+	TextStrokeTransparency = 0.25,
+	TextSize = 20,
 	Font = Enum.Font.GothamBold,
 	Visible = false
 })
-local NoticeText = Label(Notification, "The interface is closed. Press L to reopen.", UDim2.new(1, -50, 1, -10), UDim2.fromOffset(36, 5), 11, Colors.White, Enum.Font.GothamSemibold)
-NoticeText.TextWrapped = true
-NoticeText.TextTruncate = Enum.TextTruncate.None
-local NoticeClose = Button(Notification, "X", UDim2.fromOffset(23, 23), UDim2.fromOffset(6, 6), Colors.Input, 10)
-NoticeClose.ZIndex = 31
+
+local ToastFrame = New("Frame", ScreenGui, {
+	Name = "QuickToast",
+	AnchorPoint = Vector2.new(0.5, 1),
+	Size = UDim2.fromOffset(310, 42),
+	Position = UDim2.new(0.5, 0, 1, -20),
+	BackgroundColor3 = Colors.Panel,
+	BackgroundTransparency = 0.06,
+	BorderSizePixel = 0,
+	ZIndex = 110,
+	Visible = false
+})
+Corner(ToastFrame, 9)
+Stroke(ToastFrame, Colors.Accent, 1)
+local ToastText = Label(ToastFrame, "", UDim2.new(1, -28, 1, 0), UDim2.fromOffset(14, 0), 10, Colors.White, Enum.Font.GothamSemibold)
+ToastText.ZIndex = 111
+local ToastSerial = 0
+local function Toast(message, good)
+	if not alive then return end
+	ToastSerial += 1
+	local token = ToastSerial
+	ToastText.Text = tostring(message)
+	local toastStroke = ToastFrame:FindFirstChildOfClass("UIStroke")
+	if toastStroke then toastStroke.Color = good and Colors.Green or Colors.Accent end
+	ToastFrame.Visible = true
+	ToastFrame.Position = UDim2.new(0.5, 0, 1, 20)
+	TweenService:Create(ToastFrame, TweenInfo.new(0.23, Enum.EasingStyle.Quint), {Position = UDim2.new(0.5, 0, 1, -20)}):Play()
+	task.delay(2.6, function()
+		if not alive or token ~= ToastSerial then return end
+		local tween = TweenService:Create(ToastFrame, TweenInfo.new(0.18), {Position = UDim2.new(0.5, 0, 1, 20)})
+		tween:Play()
+		tween.Completed:Wait()
+		if alive and token == ToastSerial then ToastFrame.Visible = false end
+	end)
+end
 
 local function ShowNotice(message)
 	NoticeSerial += 1
 	local token = NoticeSerial
 	NoticeText.Text = message
 	Notification.Visible = true
+	Notification.Position = UDim2.new(1, 380, 1, -16)
+	TweenService:Create(Notification, TweenInfo.new(0.35, Enum.EasingStyle.Quint), {Position = UDim2.new(1, -16, 1, -16)}):Play()
 	task.delay(4, function()
 		if alive and token == NoticeSerial then Notification.Visible = false end
 	end)
@@ -614,25 +730,54 @@ end)
 
 local PageFrames = {}
 local TabButtons = {}
-local TabNames = {"Character", "Visuals & ESP", "Camera", "More coming soon!", "SETTINGS"}
-
+local TabIndicators = {}
+local TabNames = {"Overview", "Character", "Visuals & ESP", "Camera", "More coming soon!", "SETTINGS"}
+local TabIcons = {"⌂", "♟", "◈", "◉", "+", "⚙"}
+local TabDescriptions = {
+	Overview = "SYSTEM STATUS  /  SHORTCUTS  /  QUICK ACCESS",
+	Character = "PLAYER MOVEMENT  /  REALTIME VALUE LOCK",
+	["Visuals & ESP"] = "HIGHLIGHTS  /  INVISIBILITY  /  PLAYER TRACKING",
+	Camera = "FIELD OF VIEW  /  CLIENT VIEW SETTINGS",
+	["More coming soon!"] = "PROJECT ROADMAP  /  FUTURE EXPANSIONS",
+	SETTINGS = "PRESETS  /  KEYBINDS  /  SYSTEM CONTROLS"
+}
+local SetActiveTab
 local function RefreshTabs()
 	for name, button in pairs(TabButtons) do
 		local selected = VisibleTab == name
-		button.BackgroundColor3 = selected and Colors.Accent or Colors.Card
-		button.TextColor3 = selected and Colors.White or Colors.Muted
+		local color = selected and Colors.Card or Colors.Panel
+		TweenService:Create(button, TweenInfo.new(0.16), {BackgroundColor3 = color, TextColor3 = selected and Colors.White or Colors.Muted}):Play()
+		local bar = TabIndicators[name]
+		if bar then bar.BackgroundTransparency = selected and 0 or 1 end
 	end
-	for name, frame in pairs(PageFrames) do frame.Visible = VisibleTab == name end
+	for name, frame in pairs(PageFrames) do
+		frame.Visible = VisibleTab == name
+	end
+end
+
+SetActiveTab = function(name)
+	if not PageFrames[name] then return end
+	VisibleTab = name
+	RefreshTabs()
+	PageFrames[name].CanvasPosition = Vector2.zero
 end
 
 local function AddPage(name, index)
-	local tab = Button(Sidebar, name, UDim2.new(1, -18, 0, 35), UDim2.fromOffset(9, 45 + (index - 1) * 43), Colors.Card, 11)
+	local tab = Button(Sidebar, "   " .. name, UDim2.new(1, -20, 0, 39), UDim2.fromOffset(10, 132 + (index - 1) * 43), Colors.Panel, 10)
+	tab.Name = "Tab_" .. name
 	tab.TextXAlignment = Enum.TextXAlignment.Left
-	New("UIPadding", tab, {PaddingLeft = UDim.new(0, 10)})
+	tab.Font = Enum.Font.GothamSemibold
+	if tab:FindFirstChildOfClass("UIStroke") then tab:FindFirstChildOfClass("UIStroke").Transparency = 0.7 end
+	local activeBar = New("Frame", tab, {Size = UDim2.fromOffset(3, 23), Position = UDim2.new(0, 0, 0.5, -11), BackgroundColor3 = Colors.Accent, BackgroundTransparency = 1, BorderSizePixel = 0, ZIndex = 5})
+	Corner(activeBar, 2)
 	TabButtons[name] = tab
-	Connect(tab.MouseButton1Click, function()
-		VisibleTab = name
-		RefreshTabs()
+	TabIndicators[name] = activeBar
+	Connect(tab.MouseButton1Click, function() SetActiveTab(name) end)
+	Connect(tab.MouseEnter, function()
+		if VisibleTab ~= name then TweenService:Create(tab, TweenInfo.new(0.13), {BackgroundColor3 = Colors.Hover}):Play() end
+	end)
+	Connect(tab.MouseLeave, function()
+		if VisibleTab ~= name then TweenService:Create(tab, TweenInfo.new(0.13), {BackgroundColor3 = Colors.Panel}):Play() end
 	end)
 
 	local page = New("ScrollingFrame", Content, {
@@ -644,105 +789,118 @@ local function AddPage(name, index)
 		ScrollBarImageColor3 = Colors.Accent,
 		BackgroundTransparency = 1,
 		BorderSizePixel = 0,
-		Visible = name == VisibleTab
+		Visible = name == VisibleTab,
+		ZIndex = 4
 	})
 	New("UIPadding", page, {
 		PaddingTop = UDim.new(0, 14),
-		PaddingBottom = UDim.new(0, 18),
-		PaddingLeft = UDim.new(0, 14),
-		PaddingRight = UDim.new(0, 14)
+		PaddingBottom = UDim.new(0, 20),
+		PaddingLeft = UDim.new(0, 13),
+		PaddingRight = UDim.new(0, 13)
 	})
-	New("UIListLayout", page, {
-		SortOrder = Enum.SortOrder.LayoutOrder,
-		Padding = UDim.new(0, 9),
-		HorizontalAlignment = Enum.HorizontalAlignment.Left
-	})
+	New("UIListLayout", page, {SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, 10)})
 	PageFrames[name] = page
+
+	local hero = New("Frame", page, {Name = "Hero", Size = UDim2.new(1, -5, 0, 93), BackgroundColor3 = Colors.Card, BorderSizePixel = 0})
+	Corner(hero, 10)
+	Stroke(hero, Colors.Border, 1)
+	New("UIGradient", hero, {Rotation = 5, Color = ColorSequence.new(Color3.fromRGB(44, 29, 41), Colors.Card)})
+	local stripe = New("Frame", hero, {Size = UDim2.fromOffset(4, 55), Position = UDim2.fromOffset(12, 19), BackgroundColor3 = Colors.Accent, BorderSizePixel = 0})
+	Corner(stripe, 3)
+	Label(hero, string.upper(name), UDim2.new(1, -33, 0, 34), UDim2.fromOffset(26, 13), 18, Colors.White, Enum.Font.GothamBlack)
+	local desc = Label(hero, TabDescriptions[name] or "HUSS VALLEY INTERFACE", UDim2.new(1, -33, 0, 28), UDim2.fromOffset(27, 50), 9, Colors.Muted, Enum.Font.GothamSemibold)
+	desc.TextWrapped = true
+	desc.TextTruncate = Enum.TextTruncate.None
 	return page
 end
 
-local CharacterPage = AddPage(TabNames[1], 1)
-local VisualsPage = AddPage(TabNames[2], 2)
-local CameraPage = AddPage(TabNames[3], 3)
-local ComingPage = AddPage(TabNames[4], 4)
-local SettingsPage = AddPage(TabNames[5], 5)
+local OverviewPage = AddPage(TabNames[1], 1)
+local CharacterPage = AddPage(TabNames[2], 2)
+local VisualsPage = AddPage(TabNames[3], 3)
+local CameraPage = AddPage(TabNames[4], 4)
+local ComingPage = AddPage(TabNames[5], 5)
+local SettingsPage = AddPage(TabNames[6], 6)
 
 local function Card(page, title, height)
-	local card = New("Frame", page, {
-		Name = title,
-		Size = UDim2.new(1, -5, 0, height or 65),
-		BackgroundColor3 = Colors.Card,
-		BorderSizePixel = 0
-	})
-	Corner(card, 6)
-	Stroke(card, Colors.Border, 1)
+	local card = New("Frame", page, {Name = title, Size = UDim2.new(1, -5, 0, height or 76), BackgroundColor3 = Colors.Card, BorderSizePixel = 0})
+	Corner(card, 9)
+	local stroke = Stroke(card, Colors.Border, 1)
+	Connect(card.MouseEnter, function()
+		TweenService:Create(card, TweenInfo.new(0.15), {BackgroundColor3 = Colors.Hover}):Play()
+		TweenService:Create(stroke, TweenInfo.new(0.15), {Color = Colors.Accent}):Play()
+	end)
+	Connect(card.MouseLeave, function()
+		TweenService:Create(card, TweenInfo.new(0.15), {BackgroundColor3 = Colors.Card}):Play()
+		TweenService:Create(stroke, TweenInfo.new(0.15), {Color = Colors.Border}):Play()
+	end)
 	return card
 end
 
 local function AddSection(page, text)
-	local section = New("TextLabel", page, {
-		Name = "Section",
-		Size = UDim2.new(1, -5, 0, 20),
-		BackgroundTransparency = 1,
-		Text = text,
-		TextColor3 = Colors.Accent,
-		TextSize = 12,
-		Font = Enum.Font.GothamBold,
-		TextXAlignment = Enum.TextXAlignment.Left
-	})
+	local section = New("Frame", page, {Name = "Section_" .. text, Size = UDim2.new(1, -5, 0, 25), BackgroundTransparency = 1})
+	Label(section, text, UDim2.new(1, -10, 1, 0), UDim2.fromOffset(2, 0), 10, Colors.Accent, Enum.Font.GothamBold)
 	return section
 end
 
 local function AddToggle(page, title, description, key)
-	local card = Card(page, title, 60)
-	Label(card, title, UDim2.new(1, -95, 0, 22), UDim2.fromOffset(12, 8), 12, Colors.White, Enum.Font.GothamBold)
-	Label(card, description, UDim2.new(1, -92, 0, 20), UDim2.fromOffset(12, 32), 9, Colors.Muted)
-	local button = Button(card, "OFF", UDim2.fromOffset(65, 28), UDim2.new(1, -77, 0.5, -14), Colors.Input, 11)
+	local card = Card(page, title, 78)
+	local nameLabel = Label(card, title, UDim2.new(1, -110, 0, 24), UDim2.fromOffset(15, 12), 12, Colors.White, Enum.Font.GothamBold)
+	local desc = Label(card, description, UDim2.new(1, -112, 0, 35), UDim2.fromOffset(15, 37), 9, Colors.Muted)
+	desc.TextWrapped = true
+	desc.TextTruncate = Enum.TextTruncate.None
+	local button = Button(card, "", UDim2.fromOffset(66, 30), UDim2.new(1, -82, 0.5, -15), Colors.Input, 11)
+	local switchCorner = button:FindFirstChildOfClass("UICorner")
+	if switchCorner then switchCorner.CornerRadius = UDim.new(0, 15) end
+	local knob = New("Frame", button, {Name = "Knob", Size = UDim2.fromOffset(22, 22), Position = UDim2.fromOffset(4, 4), BackgroundColor3 = Colors.White, BorderSizePixel = 0})
+	Corner(knob, 11)
+	local previousEnabled = nil
 	local function Refresh()
 		local enabled = Settings[key] == true
-		button.Text = enabled and "ON" or "OFF"
-		button.BackgroundColor3 = enabled and Colors.Green or Colors.Input
-		button.TextColor3 = enabled and Colors.Main or Colors.White
+		if previousEnabled == enabled then return end
+		previousEnabled = enabled
+		TweenService:Create(button, TweenInfo.new(0.17), {BackgroundColor3 = enabled and Colors.Green or Colors.Input}):Play()
+		TweenService:Create(knob, TweenInfo.new(0.17, Enum.EasingStyle.Quint), {Position = enabled and UDim2.fromOffset(40, 4) or UDim2.fromOffset(4, 4)}):Play()
+		button.Text = ""
 	end
 	table.insert(UIRefreshers, Refresh)
 	Refresh()
 	Connect(button.MouseButton1Click, function()
 		SetSetting(key, not Settings[key])
+		Toast(title .. (Settings[key] and "  /  ENABLED" or "  /  DISABLED"), Settings[key])
 	end)
 	return card
 end
 
 local function AddSlider(page, title, description, key, minimum, sliderMaximum, absoluteMaximum)
-	local card = Card(page, title, 85)
-	Label(card, title, UDim2.new(0, 115, 0, 21), UDim2.fromOffset(12, 6), 12, Colors.White, Enum.Font.GothamBold)
-	local valueLabel = Label(card, "", UDim2.new(1, -140, 0, 21), UDim2.fromOffset(126, 6), 11, Colors.Accent, Enum.Font.GothamBold)
-	Label(card, description, UDim2.new(1, -24, 0, 18), UDim2.fromOffset(12, 28), 9, Colors.Muted)
+	local card = Card(page, title, 123)
+	local titleLabel = Label(card, title, UDim2.new(1, -96, 0, 23), UDim2.fromOffset(15, 9), 12, Colors.White, Enum.Font.GothamBold)
+	local valueLabel = Label(card, "", UDim2.fromOffset(85, 23), UDim2.new(1, -100, 0, 9), 13, Colors.Accent, Enum.Font.GothamBold)
+	valueLabel.TextXAlignment = Enum.TextXAlignment.Right
+	local desc = Label(card, description, UDim2.new(1, -30, 0, 31), UDim2.fromOffset(15, 34), 9, Colors.Muted)
+	desc.TextWrapped = true
+	desc.TextTruncate = Enum.TextTruncate.None
+	local minLabel = Label(card, tostring(minimum), UDim2.new(0.4, 0, 0, 17), UDim2.fromOffset(16, 102), 9, Colors.Muted, Enum.Font.Code)
+	local maxLabel = Label(card, tostring(sliderMaximum), UDim2.fromOffset(65, 17), UDim2.new(1, -174, 0, 102), 9, Colors.Muted, Enum.Font.Code)
+	maxLabel.TextXAlignment = Enum.TextXAlignment.Right
 	local track = New("Frame", card, {
 		Name = "SliderTrack",
-		Size = UDim2.new(1, -103, 0, 6),
-		Position = UDim2.new(0, 12, 0, 62),
+		Size = UDim2.new(1, -114, 0, 7),
+		Position = UDim2.fromOffset(15, 87),
 		BackgroundColor3 = Colors.Input,
 		BorderSizePixel = 0,
 		Active = true
 	})
-	Corner(track, 3)
-	local fill = New("Frame", track, {
-		Size = UDim2.new(0, 0, 1, 0),
-		BackgroundColor3 = Colors.Accent,
-		BorderSizePixel = 0
-	})
-	Corner(fill, 3)
-	local knob = New("Frame", track, {
-		Size = UDim2.fromOffset(14, 14),
-		Position = UDim2.new(0, -7, 0.5, -7),
-		BackgroundColor3 = Colors.White,
-		BorderSizePixel = 0
-	})
-	Corner(knob, 7)
+	Corner(track, 5)
+	local fill = New("Frame", track, {Size = UDim2.fromScale(0, 1), BackgroundColor3 = Colors.Accent, BorderSizePixel = 0})
+	Corner(fill, 5)
+	New("UIGradient", fill, {Color = ColorSequence.new(Colors.Accent, Color3.fromRGB(255, 142, 124))})
+	local knob = New("Frame", track, {Size = UDim2.fromOffset(16, 16), Position = UDim2.new(0, -8, 0.5, -8), BackgroundColor3 = Colors.White, BorderSizePixel = 0})
+	Corner(knob, 8)
+	Stroke(knob, Colors.Accent, 2)
 	local textbox = New("TextBox", card, {
-		Name = "FixedValueTextbox",
-		Size = UDim2.new(1, -103, 0, 26),
-		Position = UDim2.new(0, 12, 0, 52),
+		Name = "FixedValueInput",
+		Size = UDim2.new(1, -114, 0, 31),
+		Position = UDim2.fromOffset(15, 75),
 		BackgroundColor3 = Colors.Input,
 		BorderSizePixel = 0,
 		TextColor3 = Colors.White,
@@ -751,76 +909,71 @@ local function AddSlider(page, title, description, key, minimum, sliderMaximum, 
 		TextXAlignment = Enum.TextXAlignment.Left,
 		ClearTextOnFocus = false,
 		Visible = false,
-		PlaceholderText = "Enter a fixed value"
+		PlaceholderText = "Enter value and press Enter"
 	})
-	Stroke(textbox, Colors.White, 1)
-	New("UIPadding", textbox, {PaddingLeft = UDim.new(0, 8)})
-	local modeButtonSize = UserInputService.TouchEnabled and 32 or 25
-	local setButton = Button(card, "S", UDim2.fromOffset(modeButtonSize, modeButtonSize), UDim2.new(1, -(modeButtonSize * 2 + 14), 0, 52), Colors.Hover, 12, true)
-	local textButton = Button(card, "T", UDim2.fromOffset(modeButtonSize, modeButtonSize), UDim2.new(1, -(modeButtonSize + 14), 0, 52), Colors.Input, 12, true)
+	Corner(textbox, 5)
+	Stroke(textbox, Colors.Border, 1)
+	New("UIPadding", textbox, {PaddingLeft = UDim.new(0, 9), PaddingRight = UDim.new(0, 8)})
+	local modeSize = UserInputService.TouchEnabled and 33 or 27
+	local setButton = Button(card, "S", UDim2.fromOffset(modeSize, modeSize), UDim2.new(1, -(modeSize * 2 + 21), 0, 77), Colors.Hover, 12, true)
+	local textButton = Button(card, "T", UDim2.fromOffset(modeSize, modeSize), UDim2.new(1, -(modeSize + 19), 0, 77), Colors.Input, 12, true)
 	local setStroke = setButton:FindFirstChildOfClass("UIStroke")
 	local textStroke = textButton:FindFirstChildOfClass("UIStroke")
 	setStroke.Color = Colors.White
 	textStroke.Color = Colors.White
 	local mode = "S"
 	local dragging = false
+	local activeTouch = nil
 	local function Format(value)
-		if math.abs(value - math.floor(value + 0.5)) < 0.0001 then
-			return tostring(math.floor(value + 0.5))
-		end
+		if math.abs(value - math.floor(value + 0.5)) < 0.00001 then return tostring(math.floor(value + 0.5)) end
 		return string.format("%.2f", value)
 	end
 	local function Refresh()
-		local value = Settings[key]
+		local value = tonumber(Settings[key]) or minimum
 		valueLabel.Text = Format(value)
-		local alpha = math.clamp((value - minimum) / (sliderMaximum - minimum), 0, 1)
+		local alpha = math.clamp((value - minimum) / math.max(sliderMaximum - minimum, 1), 0, 1)
 		fill.Size = UDim2.new(alpha, 0, 1, 0)
-		knob.Position = UDim2.new(alpha, -7, 0.5, -7)
+		knob.Position = UDim2.new(alpha, -8, 0.5, -8)
 		if not textbox:IsFocused() then textbox.Text = Format(value) end
 		track.Visible = mode == "S"
 		textbox.Visible = mode == "T"
-		setButton.BackgroundColor3 = mode == "S" and Colors.Hover or Colors.Input
-		textButton.BackgroundColor3 = mode == "T" and Colors.Hover or Colors.Input
+		setButton.BackgroundColor3 = mode == "S" and Colors.Accent or Colors.Input
+		textButton.BackgroundColor3 = mode == "T" and Colors.Accent or Colors.Input
 		setStroke.Thickness = mode == "S" and 2 or 1
 		textStroke.Thickness = mode == "T" and 2 or 1
+		minLabel.Visible = mode == "S"
+		maxLabel.Visible = mode == "S"
 	end
 	table.insert(UIRefreshers, Refresh)
 	Refresh()
 	local function Drag(input)
 		if mode ~= "S" or track.AbsoluteSize.X <= 0 then return end
 		local alpha = math.clamp((input.Position.X - track.AbsolutePosition.X) / track.AbsoluteSize.X, 0, 1)
-		local value = math.floor(minimum + (sliderMaximum - minimum) * alpha + 0.5)
-		SetSetting(key, value)
+		SetSetting(key, math.floor(minimum + (sliderMaximum - minimum) * alpha + 0.5))
 	end
 	Connect(track.InputBegan, function(input)
-		if mode == "S" and (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) then
+		if mode ~= "S" then return end
+		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
 			dragging = true
+			activeTouch = input.UserInputType == Enum.UserInputType.Touch and input or nil
 			Drag(input)
 		end
 	end)
 	Connect(UserInputService.InputChanged, function(input)
-		if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
-			Drag(input)
-		end
+		if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or (input.UserInputType == Enum.UserInputType.Touch and input == activeTouch)) then Drag(input) end
 	end)
 	Connect(UserInputService.InputEnded, function(input)
-		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-			dragging = false
-		end
+		if dragging and (input.UserInputType == Enum.UserInputType.MouseButton1 or input == activeTouch) then dragging = false activeTouch = nil end
 	end)
-	Connect(setButton.MouseButton1Click, function()
-		mode = "S"
-		Refresh()
-	end)
-	Connect(textButton.MouseButton1Click, function()
-		mode = "T"
-		Refresh()
-		textbox:CaptureFocus()
-	end)
+	Connect(setButton.MouseButton1Click, function() mode = "S" Refresh() end)
+	Connect(textButton.MouseButton1Click, function() mode = "T" Refresh() textbox:CaptureFocus() end)
 	Connect(textbox.FocusLost, function()
 		local number = tonumber(textbox.Text)
 		if number and number == number and number ~= math.huge and number ~= -math.huge then
 			SetSetting(key, math.clamp(number, minimum, absoluteMaximum))
+			Toast(title .. "  /  " .. Format(Settings[key]), true)
+		else
+			Toast("INVALID INPUT  /  " .. title, false)
 		end
 		Refresh()
 	end)
@@ -828,76 +981,122 @@ local function AddSlider(page, title, description, key, minimum, sliderMaximum, 
 end
 
 local function AddModeSelector(page)
-	local card = Card(page, "Invisibility Mode", 68)
-	Label(card, "Invisibility Mode", UDim2.new(1, -20, 0, 18), UDim2.fromOffset(12, 6), 12, Colors.White, Enum.Font.GothamBold)
-	Label(card, "Air: R6 pose | Bottom: below floor", UDim2.new(1, -20, 0, 16), UDim2.fromOffset(12, 23), 9, Colors.Muted)
-	local airButton = Button(card, "Air", UDim2.fromOffset(70, 23), UDim2.fromOffset(12, 42), Colors.Input, 10)
-	local bottomButton = Button(card, "Bottom", UDim2.fromOffset(70, 23), UDim2.fromOffset(87, 42), Colors.Input, 10)
+	local card = Card(page, "Invisibility Mode", 83)
+	Label(card, "Invisibility Mode", UDim2.new(1, -26, 0, 21), UDim2.fromOffset(15, 8), 12, Colors.White, Enum.Font.GothamBold)
+	Label(card, "Choose local visibility behavior", UDim2.new(1, -26, 0, 18), UDim2.fromOffset(15, 29), 9, Colors.Muted)
+	local airButton = Button(card, "AIR  /  R6", UDim2.new(0.5, -22, 0, 27), UDim2.fromOffset(15, 51), Colors.Input, 10)
+	local bottomButton = Button(card, "BOTTOM", UDim2.new(0.5, -22, 0, 27), UDim2.new(0.5, 7, 0, 51), Colors.Input, 10)
 	local function Refresh()
 		airButton.BackgroundColor3 = Settings.InvisibilityMode == "Air" and Colors.Accent or Colors.Input
 		bottomButton.BackgroundColor3 = Settings.InvisibilityMode == "Bottom" and Colors.Accent or Colors.Input
 	end
 	table.insert(UIRefreshers, Refresh)
 	Refresh()
-	Connect(airButton.MouseButton1Click, function() SetSetting("InvisibilityMode", "Air") end)
-	Connect(bottomButton.MouseButton1Click, function() SetSetting("InvisibilityMode", "Bottom") end)
+	Connect(airButton.MouseButton1Click, function() SetSetting("InvisibilityMode", "Air") Toast("INVISIBILITY MODE  /  AIR", true) end)
+	Connect(bottomButton.MouseButton1Click, function() SetSetting("InvisibilityMode", "Bottom") Toast("INVISIBILITY MODE  /  BOTTOM", true) end)
 end
 
-AddSection(CharacterPage, "CHARACTER SETTINGS")
-AddToggle(CharacterPage, "Apply Speed", "Keep selected WalkSpeed using RunService", "ApplySpeed")
-AddSlider(CharacterPage, "Speed", "S: slider (0-500) | T: exact value (up to 1,000,000)", "Speed", 0, 500, 1000000)
-AddToggle(CharacterPage, "Apply JumpPower", "Keep selected JumpPower using RunService", "ApplyJumpPower")
-AddSlider(CharacterPage, "JumpPower", "S: slider (0-500) | T: exact value (up to 1,000,000)", "JumpPower", 0, 500, 1000000)
+AddSection(OverviewPage, "SYSTEM OVERVIEW")
+local SystemCard = Card(OverviewPage, "SystemTelemetry", 126)
+local SystemBadge = Label(SystemCard, "●  ALL SYSTEMS OPERATIONAL", UDim2.new(1, -20, 0, 22), UDim2.fromOffset(15, 10), 10, Colors.Green, Enum.Font.GothamBold)
+local OverviewSpeed = Label(SystemCard, "SPEED    --", UDim2.new(1, -25, 0, 22), UDim2.fromOffset(15, 39), 12, Colors.White, Enum.Font.Code)
+local OverviewJump = Label(SystemCard, "JUMP     --", UDim2.new(1, -25, 0, 22), UDim2.fromOffset(15, 62), 12, Colors.White, Enum.Font.Code)
+local OverviewFOV = Label(SystemCard, "FOV      --", UDim2.new(1, -25, 0, 22), UDim2.fromOffset(15, 85), 12, Colors.White, Enum.Font.Code)
 
-AddSection(VisualsPage, "VISUALS & ESP")
-AddToggle(VisualsPage, "Show Global ESP", "White highlight for every other player, all teams", "ShowGlobalESP")
-AddToggle(VisualsPage, "Show Team ESP", "Highlight players with their own team colors", "ShowTeamESP")
-AddToggle(VisualsPage, "Invisibility", "Local invisibility test with Air / Bottom mode", "Invisibility")
+AddSection(OverviewPage, "QUICK NAVIGATION")
+local QuickCard = Card(OverviewPage, "QuickActions", 113)
+Label(QuickCard, "JUMP TO A MODULE", UDim2.new(1, -25, 0, 22), UDim2.fromOffset(15, 9), 10, Colors.Muted, Enum.Font.GothamBold)
+local QuickCharacter = Button(QuickCard, "CHARACTER", UDim2.new(0.5, -22, 0, 34), UDim2.fromOffset(15, 40), Colors.Input, 10)
+local QuickVisuals = Button(QuickCard, "VISUALS / ESP", UDim2.new(0.5, -22, 0, 34), UDim2.new(0.5, 7, 0, 40), Colors.Input, 10)
+Connect(QuickCharacter.MouseButton1Click, function() SetActiveTab("Character") end)
+Connect(QuickVisuals.MouseButton1Click, function() SetActiveTab("Visuals & ESP") end)
+Label(QuickCard, "L / GUI   ·   N / MOUSE   ·   DRAG / RESIZE", UDim2.new(1, -25, 0, 22), UDim2.fromOffset(15, 83), 9, Colors.Muted, Enum.Font.Gotham)
+
+AddSection(OverviewPage, "KEYBINDS & CONTROLS")
+local Shortcuts = Card(OverviewPage, "ControlGuide", 105)
+Label(Shortcuts, "L   Toggle interface      N   Mouse unlock / lock", UDim2.new(1, -20, 0, 24), UDim2.fromOffset(15, 12), 10, Colors.White, Enum.Font.Code)
+Label(Shortcuts, "Double-click header   Maximize / Restore", UDim2.new(1, -20, 0, 24), UDim2.fromOffset(15, 41), 10, Colors.Muted, Enum.Font.Code)
+Label(Shortcuts, "8 resize zones       Mouse + touch supported", UDim2.new(1, -20, 0, 24), UDim2.fromOffset(15, 70), 10, Colors.Muted, Enum.Font.Code)
+
+AddSection(CharacterPage, "MOVEMENT  /  LIVE OVERRIDES")
+AddToggle(CharacterPage, "Apply Speed", "Enable a continuous local WalkSpeed lock", "ApplySpeed")
+AddSlider(CharacterPage, "Speed", "S = slider 0–500  |  T = numeric 0–1,000,000", "Speed", 0, 500, 1000000)
+AddToggle(CharacterPage, "Apply JumpPower", "Enable a continuous local JumpPower lock", "ApplyJumpPower")
+AddSlider(CharacterPage, "JumpPower", "S = slider 0–500  |  T = numeric 0–1,000,000", "JumpPower", 0, 500, 1000000)
+local CharacterInfo = Card(CharacterPage, "CharacterInfo", 63)
+local CharacterStatusText = Label(CharacterInfo, "Speed and JumpPower are client-only adjustments.", UDim2.new(1, -26, 1, -10), UDim2.fromOffset(15, 5), 10, Colors.Muted, Enum.Font.Gotham)
+CharacterStatusText.TextWrapped = true
+CharacterStatusText.TextTruncate = Enum.TextTruncate.None
+
+AddSection(VisualsPage, "PLAYER HIGHLIGHTS")
+AddToggle(VisualsPage, "Show Global ESP", "White outline and fill for all other players", "ShowGlobalESP")
+AddToggle(VisualsPage, "Show Team ESP", "Use each player's team color for their highlight", "ShowTeamESP")
+AddSlider(VisualsPage, "ESP Opacity", "Adjust highlight fill transparency (outline remains)", "ESPOpacity", 0, 100, 100)
+AddSection(VisualsPage, "LOCAL INVISIBILITY")
+AddToggle(VisualsPage, "Invisibility", "Local Air / Bottom test mode — not server invisibility", "Invisibility")
 AddModeSelector(VisualsPage)
-AddSlider(VisualsPage, "Invisibility Speed", "Move speed in Air and Bottom modes", "InvisSpeed", 1, 100, 200)
-Label(VisualsPage, "Global ESP takes priority if both ESP modes are enabled.", UDim2.new(1, -10, 0, 32), UDim2.fromOffset(0, 0), 10, Colors.Muted)
+AddSlider(VisualsPage, "Invisibility Speed", "Movement speed during the active visibility mode", "InvisSpeed", 1, 100, 200)
+local ESPNote = Card(VisualsPage, "ESPNote", 70)
+local ESPNoteText = Label(ESPNote, "GLOBAL ESP TAKES PRIORITY\nESP refreshes on spawn and team changes.", UDim2.new(1, -24, 1, -14), UDim2.fromOffset(12, 7), 10, Colors.Muted, Enum.Font.GothamSemibold)
+ESPNoteText.TextWrapped = true
+ESPNoteText.TextTruncate = Enum.TextTruncate.None
 
-AddSection(CameraPage, "CAMERA SETTINGS")
-AddSlider(CameraPage, "Field Of View", "S/T: 10-300 | Roblox camera supports up to 120", "FieldOfView", 10, 300, 300)
+AddSection(CameraPage, "VIEWPORT CONTROL")
+AddSlider(CameraPage, "Field Of View", "Slider supports 10–300; Roblox applies 10–120°", "FieldOfView", 10, 300, 300)
+local FOVNote = Card(CameraPage, "CameraInformation", 87)
+Label(FOVNote, "ENGINE LIMITATION", UDim2.new(1, -25, 0, 23), UDim2.fromOffset(14, 11), 10, Colors.Accent, Enum.Font.GothamBold)
+local FOVInfo = Label(FOVNote, "The interface accepts up to 300, but Roblox camera FOV is capped at 120 degrees. The original FOV is restored when you wipe the UI.", UDim2.new(1, -27, 0, 55), UDim2.fromOffset(14, 32), 10, Colors.Muted)
+FOVInfo.TextWrapped = true
+FOVInfo.TextTruncate = Enum.TextTruncate.None
 
-AddSection(ComingPage, "MORE COMING SOON!")
-local ComingCard = Card(ComingPage, "Future Features", 100)
-Label(ComingCard, "New features will appear here.", UDim2.new(1, -24, 0, 35), UDim2.fromOffset(12, 24), 12, Colors.White)
+AddSection(ComingPage, "EXPANSION ROADMAP")
+for _, data in ipairs({
+	{"MODULE 01", "Interface customization", "PLANNED"},
+	{"MODULE 02", "Additional camera tools", "PLANNED"},
+	{"MODULE 03", "More diagnostic widgets", "PLANNED"}
+}) do
+	local card = Card(ComingPage, data[1], 75)
+	Label(card, data[1], UDim2.new(1, -22, 0, 20), UDim2.fromOffset(14, 10), 9, Colors.Accent, Enum.Font.GothamBold)
+	Label(card, data[2], UDim2.new(1, -92, 0, 29), UDim2.fromOffset(14, 31), 12, Colors.White, Enum.Font.GothamSemibold)
+	local tag = Label(card, data[3], UDim2.fromOffset(77, 25), UDim2.new(1, -87, 0.5, -12), 9, Colors.Muted, Enum.Font.GothamBold)
+	tag.TextXAlignment = Enum.TextXAlignment.Center
+end
 
-AddSection(SettingsPage, "SETTINGS")
-local PresetsCard = Card(SettingsPage, "Configuration Presets", 192)
-local SaveButton = Button(PresetsCard, "Save Configuration Presets", UDim2.new(1, -24, 0, 33), UDim2.fromOffset(12, 10), Colors.Input, 11)
+AddSection(SettingsPage, "CONFIGURATION  /  IMPORT & EXPORT")
+local PresetsCard = Card(SettingsPage, "Configuration Presets", 221)
+local SaveButton = Button(PresetsCard, "EXPORT CURRENT PRESET", UDim2.new(1, -28, 0, 34), UDim2.fromOffset(14, 11), Colors.Input, 10)
 local PresetText = New("TextBox", PresetsCard, {
 	Name = "PresetText",
-	Size = UDim2.new(1, -24, 0, 75),
-	Position = UDim2.fromOffset(12, 51),
+	Size = UDim2.new(1, -28, 0, 91),
+	Position = UDim2.fromOffset(14, 54),
 	BackgroundColor3 = Colors.Input,
 	BorderSizePixel = 0,
 	TextColor3 = Colors.White,
 	TextSize = 10,
 	Font = Enum.Font.Code,
 	Text = "",
-	PlaceholderText = "Save to generate JSON, or paste a preset here",
+	PlaceholderText = "Save to generate JSON or paste a preset here",
 	ClearTextOnFocus = false,
 	TextWrapped = true,
 	MultiLine = true,
 	TextXAlignment = Enum.TextXAlignment.Left,
 	TextYAlignment = Enum.TextYAlignment.Top
 })
-Corner(PresetText, 4)
+Corner(PresetText, 5)
 Stroke(PresetText, Colors.Border)
-New("UIPadding", PresetText, {PaddingTop = UDim.new(0, 6), PaddingLeft = UDim.new(0, 6), PaddingRight = UDim.new(0, 6)})
-local LoadButton = Button(PresetsCard, "Load Preset", UDim2.new(1, -24, 0, 29), UDim2.fromOffset(12, 132), Colors.Input, 11)
-local PresetStatus = Label(PresetsCard, "Copy the JSON manually to keep it between sessions.", UDim2.new(1, -24, 0, 20), UDim2.fromOffset(12, 165), 9, Colors.Muted)
+New("UIPadding", PresetText, {PaddingTop = UDim.new(0, 7), PaddingLeft = UDim.new(0, 7), PaddingRight = UDim.new(0, 7)})
+local LoadButton = Button(PresetsCard, "IMPORT PRESET", UDim2.new(1, -28, 0, 31), UDim2.fromOffset(14, 154), Colors.Input, 10)
+local PresetStatus = Label(PresetsCard, "Manual JSON import/export (client only)", UDim2.new(1, -28, 0, 24), UDim2.fromOffset(14, 190), 9, Colors.Muted)
 
 Connect(SaveButton.MouseButton1Click, function()
 	local ok, result = pcall(function() return HttpService:JSONEncode(Settings) end)
 	if ok then
 		PresetText.Text = result
-		PresetStatus.Text = "Preset generated. Copy it to save it permanently."
+		PresetStatus.Text = "Preset ready. Copy the JSON for later."
 		PresetStatus.TextColor3 = Colors.Green
+		Toast("PRESET EXPORTED", true)
 	else
-		PresetStatus.Text = "Couldn't generate a preset."
+		PresetStatus.Text = "Cannot export preset."
 		PresetStatus.TextColor3 = Colors.Accent
 	end
 end)
@@ -907,29 +1106,36 @@ Connect(LoadButton.MouseButton1Click, function()
 	if not ok or type(decoded) ~= "table" then
 		PresetStatus.Text = "Invalid JSON preset."
 		PresetStatus.TextColor3 = Colors.Accent
+		Toast("INVALID PRESET", false)
 		return
 	end
-	if decoded.InvisibilityMode == "Air" or decoded.InvisibilityMode == "Bottom" then
-		SetSetting("InvisibilityMode", decoded.InvisibilityMode)
-	end
-	local expectedBool = {ApplySpeed = true, ApplyJumpPower = true, ShowGlobalESP = true, ShowTeamESP = true, Invisibility = true}
-	for key in pairs(expectedBool) do
-		if type(decoded[key]) == "boolean" then SetSetting(key, decoded[key]) end
-	end
-	for _, key in ipairs({"Speed", "JumpPower", "InvisSpeed", "FieldOfView"}) do
+	if decoded.InvisibilityMode == "Air" or decoded.InvisibilityMode == "Bottom" then SetSetting("InvisibilityMode", decoded.InvisibilityMode) end
+	for _, key in ipairs({"Speed", "JumpPower", "InvisSpeed", "FieldOfView", "ESPOpacity"}) do
 		local number = decoded[key]
 		if type(number) == "number" and number == number and number ~= math.huge and number ~= -math.huge then
 			local minimum = key == "InvisSpeed" and 1 or key == "FieldOfView" and 10 or 0
-			local maximum = key == "InvisSpeed" and 200 or key == "FieldOfView" and 300 or 1000000
+			local maximum = key == "InvisSpeed" and 200 or key == "FieldOfView" and 300 or key == "ESPOpacity" and 100 or 1000000
 			SetSetting(key, math.clamp(number, minimum, maximum))
 		end
 	end
-	PresetStatus.Text = "Configuration preset loaded."
+	for _, key in ipairs({"ApplySpeed", "ApplyJumpPower", "ShowGlobalESP", "ShowTeamESP", "Invisibility"}) do
+		if type(decoded[key]) == "boolean" then SetSetting(key, decoded[key]) end
+	end
+	PresetStatus.Text = "Configuration loaded."
 	PresetStatus.TextColor3 = Colors.Green
+	Toast("PRESET LOADED", true)
 end)
 
-local DestroyCard = Card(SettingsPage, "Destroy Matrix", 76)
-local DestroyButton = Button(DestroyCard, "DESTROY MATRIX & WIPE GUI", UDim2.new(1, -24, 0, 40), UDim2.fromOffset(12, 17), Color3.fromRGB(83, 27, 37), 11)
+AddSection(SettingsPage, "HOTKEY REFERENCE")
+local HotkeyCard = Card(SettingsPage, "Hotkeys", 91)
+Label(HotkeyCard, "[ L ]   Open / hide interface", UDim2.new(1, -20, 0, 23), UDim2.fromOffset(15, 9), 10, Colors.White, Enum.Font.Code)
+Label(HotkeyCard, "[ N ]   Lock / unlock cursor", UDim2.new(1, -20, 0, 23), UDim2.fromOffset(15, 34), 10, Colors.White, Enum.Font.Code)
+Label(HotkeyCard, "[ S / T ]   Slider / textbox mode", UDim2.new(1, -20, 0, 23), UDim2.fromOffset(15, 59), 10, Colors.Muted, Enum.Font.Code)
+
+AddSection(SettingsPage, "DANGER ZONE")
+local DestroyCard = Card(SettingsPage, "Destroy Matrix", 112)
+Label(DestroyCard, "Completely shuts down all hub connections and UI.", UDim2.new(1, -30, 0, 30), UDim2.fromOffset(15, 12), 10, Colors.Muted)
+local DestroyButton = Button(DestroyCard, "DESTROY MATRIX & WIPE GUI", UDim2.new(1, -30, 0, 39), UDim2.fromOffset(15, 59), Color3.fromRGB(83, 27, 37), 11)
 local ConfirmationActive = false
 
 local function WipeHub()
@@ -953,19 +1159,40 @@ local function WipeHub()
 	print("[Huss Valley] Hub destroyed")
 end
 
+Connect(ScreenGui:GetAttributeChangedSignal("HussValleyShuttingDown"), function()
+	if ScreenGui:GetAttribute("HussValleyShuttingDown") then WipeHub() end
+end)
+
 Connect(DestroyButton.MouseButton1Click, function()
 	if not ConfirmationActive then
 		ConfirmationActive = true
 		DestroyButton.Text = "CLICK AGAIN TO CONFIRM"
+		Toast("WIPE REQUESTED  /  CONFIRM AGAIN", false)
 		task.delay(4, function()
-			if alive then
-				ConfirmationActive = false
-				DestroyButton.Text = "DESTROY MATRIX & WIPE GUI"
-			end
+			if alive then ConfirmationActive = false DestroyButton.Text = "DESTROY MATRIX & WIPE GUI" end
 		end)
 	else
 		WipeHub()
 	end
+end)
+
+local LiveUpdateAccumulator = 0
+Connect(RunService.Heartbeat, function(dt)
+	if not alive then return end
+	LiveUpdateAccumulator += dt
+	if LiveUpdateAccumulator < 0.4 then return end
+	LiveUpdateAccumulator = 0
+	local humanoid = GetCharacter() and GetCharacter():FindFirstChildOfClass("Humanoid")
+	local actualSpeed = humanoid and humanoid.WalkSpeed or 0
+	local actualJump = humanoid and humanoid.JumpPower or 0
+	local fov = workspace.CurrentCamera and workspace.CurrentCamera.FieldOfView or 70
+	local espMode = Settings.ShowGlobalESP and "GLOBAL" or Settings.ShowTeamESP and "TEAM" or "OFF"
+	FooterLine1.Text = string.format("SPEED  %.0f", actualSpeed)
+	FooterLine2.Text = "ESP    " .. espMode
+	OverviewSpeed.Text = string.format("WALKSPEED    %d   [%s]", math.floor(actualSpeed), Settings.ApplySpeed and "LOCK" or "FREE")
+	OverviewJump.Text = string.format("JUMPPOWER    %d   [%s]", math.floor(actualJump), Settings.ApplyJumpPower and "LOCK" or "FREE")
+	OverviewFOV.Text = string.format("CAMERA FOV   %.0f", fov)
+	HeaderStatus.Text = "●  CLIENT ACTIVE"
 end)
 
 local ResizeHandles = {}
@@ -983,10 +1210,10 @@ local LastHeaderClickPosition = nil
 local LastMoveVelocity = Vector2.zero
 local ActiveHandle = nil
 local LastLayoutWidth = nil
-local DisplayRectangle = {X = 0, Y = 0, W = 550, H = 420}
-local TargetRectangle = {X = 0, Y = 0, W = 550, H = 420}
+local DisplayRectangle = {X = 0, Y = 0, W = 640, H = 490}
+local TargetRectangle = {X = 0, Y = 0, W = 640, H = 490}
 local HideStatusToken = 0
-local HEADER_HEIGHT = 42
+local HEADER_HEIGHT = HeaderHeight
 local WINDOW_MARGIN = 8
 local MAGNET_DISTANCE = 15
 local IsTouch = UserInputService.TouchEnabled
@@ -1077,14 +1304,24 @@ local function UpdateAdaptiveLayout(force)
 	local width = DisplayRectangle.W
 	if not force and LastLayoutWidth and math.abs(width - LastLayoutWidth) < 2 then return end
 	LastLayoutWidth = width
-	local sidebarWidth = width < 370 and 94 or width < 480 and 112 or 165
+	local sidebarWidth = width < 390 and 99 or width < 520 and 132 or 184
 	Sidebar.Size = UDim2.new(0, sidebarWidth, 1, 0)
 	Content.Position = UDim2.fromOffset(sidebarWidth, 0)
 	Content.Size = UDim2.new(1, -sidebarWidth, 1, 0)
-	for _, button in pairs(TabButtons) do
-		button.TextWrapped = width < 480
-		button.TextSize = width < 480 and 9 or 11
+	for name, button in pairs(TabButtons) do
+		button.TextWrapped = width < 520
+		button.TextSize = width < 390 and 8 or width < 520 and 9 or 10
+		button.Text = width < 390 and name or "   " .. name
 	end
+	MainTitle.Text = width < 485 and "HUSS VALLEY" or "Aehmre's Huss Valley Hub"
+	MainTitle.TextSize = width < 485 and 13 or 13
+	SideTitle.TextSize = width < 390 and 11 or width < 520 and 14 or 18
+	SideSubtitle.TextSize = width < 390 and 7 or 9
+	FooterHeading.TextSize = width < 390 and 7 or 9
+	FooterLine1.TextSize = width < 390 and 8 or 10
+	FooterLine2.TextSize = width < 390 and 8 or 10
+	HeaderStatus.Visible = width >= 590
+	MainSubtitle.Visible = width >= 460
 end
 
 local function ShowWindowStatus(message)
@@ -1339,7 +1576,7 @@ end
 local TopRightSideHandle = New("TextButton", Main, {
 	Name = "Resize_NE_SideGrip",
 	Size = UDim2.fromOffset(IsTouch and 14 or 9, IsTouch and 28 or 22),
-	Position = UDim2.new(1, -(IsTouch and 14 or 9), 0, 38),
+	Position = UDim2.new(1, -(IsTouch and 14 or 9), 0, HeaderHeight - 5),
 	BackgroundTransparency = 1,
 	BorderSizePixel = 0,
 	Text = "",
@@ -1388,7 +1625,7 @@ local function ApplyPointerMovement(input)
 
 	if action == "move" and IsMaximized and delta.Magnitude >= 8 then
 		local relative = math.clamp((PointerStart.X - RectangleStart.X) / math.max(1, RectangleStart.W), 0.16, 0.84)
-		local original = RestoreRectangle or {X = 50, Y = 50, W = math.min(550, maxWidth), H = math.min(420, maxHeight)}
+		local original = RestoreRectangle or {X = 50, Y = 50, W = math.min(640, maxWidth), H = math.min(490, maxHeight)}
 		local restored = ClampRect({
 			X = pos.X - original.W * relative,
 			Y = math.max(WINDOW_MARGIN, pos.Y - 22),
@@ -1458,8 +1695,8 @@ Connect(UserInputService.InputEnded, function(input)
 end)
 
 local viewport = GetSafeViewport()
-local initialWidth = math.min(550, math.max(1, viewport.X - 16))
-local initialHeight = math.min(420, math.max(1, viewport.Y - 16))
+local initialWidth = math.min(640, math.max(1, viewport.X - 16))
+local initialHeight = math.min(490, math.max(1, viewport.Y - 16))
 local initial = {
 	X = math.floor((viewport.X - initialWidth) * 0.5),
 	Y = math.floor((viewport.Y - initialHeight) * 0.5),
